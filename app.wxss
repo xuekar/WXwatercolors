@@ -1,0 +1,10 @@
+/* app.wxss - 全局样式 */
+page {
+  background: #F5F5F5;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+  font-size: 28rpx;
+  color: #181818;
+  -webkit-tap-highlight-color: transparent;
+}
+
+view, text { box-sizing: border-box; }

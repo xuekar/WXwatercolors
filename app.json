@@ -1,0 +1,15 @@
+{
+  "pages": [
+    "pages/brand-list/index",
+    "pages/brand-detail/index"
+  ],
+  "lazyCodeLoading": "requiredComponents",
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#FFFFFF",
+    "navigationBarTitleText": "水彩品牌",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#F5F5F5"
+  },
+  "sitemapLocation": "sitemap.json"
+}

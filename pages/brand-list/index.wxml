@@ -1,0 +1,99 @@
+<!-- 水彩品牌列表页 -->
+<view class="page">
+
+  <!-- 头部 Tabs -->
+  <view class="tabs">
+    <view
+      class="tab {{activeTab === 'all' ? 'active' : ''}}"
+      data-tab="all"
+      bindtap="onTabChange"
+    >
+      <view class="tab-label">全部品牌</view>
+      <view class="tab-bar"></view>
+    </view>
+    <view
+      class="tab {{activeTab === 'owned' ? 'active' : ''}}"
+      data-tab="owned"
+      bindtap="onTabChange"
+    >
+      <view class="tab-label">已拥有</view>
+      <view class="tab-bar"></view>
+    </view>
+    <view
+      class="tab {{activeTab === 'unowned' ? 'active' : ''}}"
+      data-tab="unowned"
+      bindtap="onTabChange"
+    >
+      <view class="tab-label">未拥有</view>
+      <view class="tab-bar"></view>
+    </view>
+  </view>
+
+  <!-- 筛选栏 -->
+  <view class="filter-bar">
+    <view class="filter-item" bindtap="onSortTap">
+      <text class="filter-label">排序</text>
+      <text class="filter-value">{{sortLabel}}</text>
+      <text class="filter-arrow">▼</text>
+    </view>
+    <view class="filter-count">共 {{filteredList.length}} 个品牌</view>
+  </view>
+
+  <!-- 列表 -->
+  <scroll-view scroll-y class="list-scroll" enhanced show-scrollbar="{{false}}">
+    <view class="list" wx:if="{{filteredList.length > 0}}">
+      <view
+        class="brand-card"
+        wx:for="{{filteredList}}"
+        wx:key="id"
+        data-id="{{item.id}}"
+        bindtap="onBrandTap"
+        hover-class="card-hover"
+        hover-stay-time="100"
+      >
+        <view class="brand-icon" style="background: {{item.color}}">
+          <text class="brand-icon-text">{{item.iconText}}</text>
+        </view>
+
+        <view class="brand-info">
+          <view class="brand-name-cn">{{item.nameCn}}</view>
+          <view class="brand-name-en">{{item.nameEn}}</view>
+        </view>
+
+        <view class="brand-fraction {{item.ownedCount === 0 ? 'is-empty' : ''}} {{item.ownedCount > 0 && item.ownedCount === item.totalCount ? 'is-full' : ''}}">
+          <text class="fraction-num">{{item.ownedCount}}</text>
+          <view class="fraction-line"></view>
+          <text class="fraction-den">{{item.totalCount}}</text>
+        </view>
+      </view>
+      <view class="list-bottom-tip">— 已展示全部品牌 —</view>
+    </view>
+
+    <!-- 空状态 -->
+    <view class="empty-wrap" wx:else>
+      <view class="empty-icon">📂</view>
+      <view class="empty-text">暂无品牌数据</view>
+    </view>
+  </scroll-view>
+
+  <!-- 排序弹层 -->
+  <view class="mask {{sortVisible ? 'show' : ''}}" bindtap="onSortClose">
+    <view
+      class="sort-panel {{sortVisible ? 'show' : ''}}"
+      catchtap="noop"
+    >
+      <view class="sort-header">
+        <text class="sort-title">选择排序方式</text>
+        <view class="sort-close" bindtap="onSortClose">✕</view>
+      </view>
+      <view class="sort-option" data-sort="name" bindtap="onSortChange">
+        <text class="sort-option-label">按名称</text>
+        <view class="radio {{sortType === 'name' ? 'checked' : ''}}"></view>
+      </view>
+      <view class="sort-option" data-sort="colorNo" bindtap="onSortChange">
+        <text class="sort-option-label">按色号</text>
+        <view class="radio {{sortType === 'colorNo' ? 'checked' : ''}}"></view>
+      </view>
+    </view>
+  </view>
+</view>

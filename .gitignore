@@ -1,0 +1,22 @@
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Mini program build & cache
+miniprogram_npm/
+node_modules/
+package-lock.json
+
+# WorkBuddy / agent metadata
+.workbuddy/
+
+# Temp scripts
+*.tmp
+*.bak
+
+# Mini program private config (contains local debug settings)
+# Keep project.private.config.json out of version control if it has personal settings
+# But include it for now since it stores libVersion/setting that should be shared

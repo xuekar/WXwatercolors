@@ -1,0 +1,355 @@
+<!-- 品牌详情页 -->
+<view class="page">
+
+  <!-- 品牌头部信息 -->
+  <view class="brand-header">
+    <view class="brand-icon" style="background: {{brand.color}}">
+      <text class="brand-icon-text">{{brand.iconText}}</text>
+    </view>
+    <view class="brand-meta">
+      <view class="brand-name-cn">{{brand.nameCn}}</view>
+      <view class="brand-name-en">{{brand.nameEn}}</view>
+      <view class="brand-stat">
+        <text>共 {{pigmentTotal}} 个颜料</text>
+        <text class="dot">·</text>
+        <text>已拥有 {{ownedCount}} 个</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 操作栏 -->
+  <view class="action-bar">
+    <block wx:if="{{!markMode}}">
+      <view class="action-btn {{activeFilterCount > 0 ? 'active' : ''}}" bindtap="onFilterTap" hover-class="action-hover">
+        <text class="action-icon">⌒</text>
+        <text class="action-text">筛选</text>
+        <text wx:if="{{activeFilterCount > 0}}" class="action-badge">{{activeFilterCount}}</text>
+      </view>
+      <view class="action-divider"></view>
+      <view class="action-btn" bindtap="onSortTap" hover-class="action-hover">
+        <text class="action-icon">⇅</text>
+        <text class="action-text">排序</text>
+        <text class="action-sub">{{sortLabel}}</text>
+      </view>
+      <view class="action-divider"></view>
+      <view class="action-btn primary" bindtap="onMarkTap" hover-class="action-hover">
+        <text class="action-icon icon-edit">✎</text>
+        <text class="action-text">标注</text>
+      </view>
+    </block>
+    <block wx:else>
+      <view class="action-btn" bindtap="onCancelMark" hover-class="action-hover">
+        <text class="action-icon">✕</text>
+        <text class="action-text">取消</text>
+      </view>
+      <view class="action-divider"></view>
+      <view class="action-btn primary" bindtap="onToggleAll" hover-class="action-hover">
+        <text class="action-icon">{{allSelected ? '☒' : '☐'}}</text>
+        <text class="action-text">{{allSelected ? '全不选' : '全选'}}</text>
+      </view>
+    </block>
+  </view>
+
+  <!-- 已应用筛选条件 chip 区 -->
+  <view class="filter-chip-bar" wx:if="{{!markMode && activeFilters.length > 0}}">
+    <text class="filter-chip-label">已应用</text>
+    <view
+      class="filter-chip"
+      wx:for="{{activeFilters}}"
+      wx:key="key"
+      data-key="{{item.key}}"
+      bindtap="onRemoveFilterChip"
+      hover-class="filter-chip-hover"
+    >
+      <text class="filter-chip-text">{{item.label}}</text>
+      <text class="filter-chip-x">×</text>
+    </view>
+    <text class="filter-chip-count">命中 {{filteredTotal}} 个</text>
+  </view>
+
+  <!-- 表头 -->
+  <view class="table-header">
+    <view class="col-no">色号</view>
+    <view class="col-en">英文名</view>
+    <view class="col-cn">中文名</view>
+    <view class="col-swatch">色卡</view>
+    <view class="col-status">{{markMode ? '标注' : '拥有'}}</view>
+  </view>
+
+  <!-- 颜料列表 -->
+  <view wx:if="{{loading}}" class="loading-tip">数据加载中…</view>
+  <scroll-view
+    scroll-y
+    class="pigment-scroll"
+    bindscrolltolower="onListScrollToLower"
+    lower-threshold="200"
+    style="padding-bottom: {{markMode ? '180rpx' : '0'}};"
+  >
+    <view
+      class="pigment-row"
+      wx:for="{{filteredPigments}}"
+      wx:key="id"
+      data-id="{{item.id}}"
+      bindtap="onRowTap"
+      hover-class="row-hover"
+      hover-stay-time="80"
+    >
+      <view class="col-no">
+        <view class="col-no-text">{{item.colorNo}}</view>
+        <view class="col-no-sub" wx:if="{{item.transparency}}">{{item.transparency}}</view>
+      </view>
+      <view class="col-en">
+        <view class="col-en-main">{{item.nameEn}}</view>
+        <view class="col-en-sub" wx:if="{{item.pigment}}">{{item.pigment}}</view>
+      </view>
+      <view class="col-cn">{{item.nameCn}}</view>
+      <view class="col-swatch">
+        <view wx:if="{{item.swatch}}" class="swatch" style="background: {{item.swatch}}"></view>
+        <view wx:else class="swatch swatch-empty">—</view>
+      </view>
+      <view class="col-status">
+        <!-- 普通模式：拥有状态 ICON -->
+        <block wx:if="{{!markMode}}">
+          <!-- 已拥有：显示蓝色对勾 -->
+          <view wx:if="{{item.owned}}" class="brand-status owned">
+            <text class="status-icon">✓</text>
+          </view>
+          <!-- 未拥有：虚线 + 按钮，点击直接进入标注模式并自动勾选 -->
+          <view
+            wx:else
+            class="brand-status unowned dashed"
+            data-id="{{item.id}}"
+            catchtap="onUnownedTap"
+            hover-class="unowned-hover"
+            hover-stay-time="80"
+          >
+            <text class="status-icon">+</text>
+          </view>
+        </block>
+        <!-- 标注模式：方形勾选框 -->
+        <block wx:else>
+          <view class="checkbox {{item.checked ? 'checked' : ''}}">
+            <text wx:if="{{item.checked}}" class="check-mark">✓</text>
+          </view>
+        </block>
+      </view>
+    </view>
+
+    <view class="empty-wrap" wx:if="{{filteredPigments.length === 0}}">
+      <view class="empty-icon">📂</view>
+      <view class="empty-text">暂无颜料数据</view>
+    </view>
+
+    <view class="list-bottom-tip" wx:if="{{filteredPigments.length > 0}}">
+      — 共 {{filteredPigments.length}} 个颜料 —
+    </view>
+  </scroll-view>
+
+  <!-- 标注模式底部保存栏 -->
+  <view class="save-bar" wx:if="{{markMode}}">
+    <view class="save-stat">
+      已标注 <text class="save-stat-num">{{checkedCount}}</text> / {{pigmentTotal}}
+    </view>
+    <button class="save-btn" bindtap="onSave" hover-class="save-btn-hover">保存</button>
+  </view>
+
+  <!-- 排序弹层 -->
+  <view class="mask {{sortVisible ? 'show' : ''}}" bindtap="onSortClose">
+    <view class="sort-panel {{sortVisible ? 'show' : ''}}" catchtap="noop">
+      <view class="sort-header">
+        <text class="sort-title">选择排序方式</text>
+        <view class="sort-close" bindtap="onSortClose">✕</view>
+      </view>
+      <view class="sort-option" data-sort="name" bindtap="onSortChange">
+        <text class="sort-option-label">按名称</text>
+        <view class="radio {{sortType === 'name' ? 'checked' : ''}}"></view>
+      </view>
+      <view class="sort-option" data-sort="colorNo" bindtap="onSortChange">
+        <text class="sort-option-label">按色号</text>
+        <view class="radio {{sortType === 'colorNo' ? 'checked' : ''}}"></view>
+      </view>
+      <view class="sort-option" data-sort="swatch" bindtap="onSortChange">
+        <text class="sort-option-label">按色卡（相近色由浅到深）</text>
+        <view class="radio {{sortType === 'swatch' ? 'checked' : ''}}"></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- Toast -->
+  <view class="toast {{toastVisible ? 'show' : ''}}">
+    <text class="toast-icon">✓</text>
+    <text class="toast-text">{{toastText}}</text>
+  </view>
+
+  <!-- 颜料详情抽屉 -->
+  <view class="mask {{drawerVisible ? 'show' : ''}}" bindtap="closeDrawer">
+    <view class="drawer {{drawerVisible ? 'show' : ''}}" catchtap="noop">
+      <view class="drawer-handle"></view>
+
+      <!-- 头部：色卡 + 名称 + 状态徽章 + 色号 chip -->
+      <view class="drawer-header">
+        <view wx:if="{{drawerPigment.swatch}}" class="drawer-swatch" style="background: {{drawerPigment.swatch}};"></view>
+        <view wx:else class="drawer-swatch drawer-swatch-empty">无色卡</view>
+        <view class="drawer-meta">
+          <view class="drawer-title-row">
+            <text class="drawer-title">{{drawerPigment.nameCn}}</text>
+            <view wx:if="{{drawerPigment.owned}}" class="drawer-badge owned">
+              <text class="drawer-badge-icon">✓</text>
+            </view>
+            <view wx:else class="drawer-badge unowned">
+              <text class="drawer-badge-icon">+</text>
+            </view>
+          </view>
+          <view class="drawer-en">{{drawerPigment.nameEn}}</view>
+          <view class="drawer-chip-wrap">
+            <text class="drawer-chip">{{drawerPigment.colorNo}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 色料卡片 -->
+      <view class="info-card">
+        <view class="info-label">色料</view>
+        <view class="info-value mono">{{drawerPigment.pigment || '—'}}</view>
+      </view>
+
+      <!-- 透明度卡片 -->
+      <view class="info-card transparency-card">
+        <view class="info-label">透明度</view>
+        <view class="transparency-row">
+          <view class="transparency-text">
+            <view class="transparency-cn">{{drawerTransCn}}</view>
+            <view class="transparency-en">{{drawerPigment.transparency || '—'}}</view>
+          </view>
+          <view class="transparency-dot" style="background: {{drawerTransDot}};"></view>
+        </view>
+      </view>
+
+      <!-- 行动按钮 -->
+      <view
+        class="drawer-action {{drawerPigment.owned ? 'secondary' : 'primary'}}"
+        bindtap="onDrawerToggleOwned"
+        hover-class="action-btn-hover"
+      >
+        <text class="drawer-action-icon">{{drawerPigment.owned ? '−' : '+'}}</text>
+        <text class="drawer-action-text">{{drawerPigment.owned ? '取消拥有' : '标记为已拥有'}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 筛选主弹层 -->
+  <view class="mask {{filterMainVisible ? 'show' : ''}}" bindtap="onFilterMainClose">
+    <view class="filter-panel {{filterMainVisible ? 'show' : ''}}" catchtap="noop">
+      <view class="filter-handle"></view>
+      <view class="filter-title">筛选条件</view>
+
+      <view class="filter-row">
+        <view class="filter-row-text">
+          <view class="filter-row-label">已拥有</view>
+          <view class="filter-row-sub">仅显示已标记拥有的颜料</view>
+        </view>
+        <view class="switch {{filterOwned ? 'on' : ''}}" catchtap="onFilterOwnedToggle">
+          <view class="switch-thumb"></view>
+        </view>
+      </view>
+
+      <view class="filter-row clickable" bindtap="onOpenPigmentFilter" hover-class="filter-row-hover">
+        <view class="filter-row-text">
+          <view class="filter-row-label">按色料</view>
+          <view class="filter-row-sub">{{filterPigment ? filterPigment : '未选'}}</view>
+        </view>
+        <text class="filter-row-arrow">›</text>
+      </view>
+
+      <view class="filter-row clickable" bindtap="onOpenTransparencyFilter" hover-class="filter-row-hover">
+        <view class="filter-row-text">
+          <view class="filter-row-label">按透明度</view>
+          <view class="filter-row-sub">{{filterTransparency ? (filterTransparency === 'Opaque' ? '不透明' : filterTransparency === 'Semi-Opaque' ? '半不透明' : filterTransparency === 'Semi-Transparent' ? '半透明' : '透明') : '未选'}}</view>
+        </view>
+        <text class="filter-row-arrow">›</text>
+      </view>
+
+      <view class="filter-actions">
+        <view class="filter-btn secondary" bindtap="onFilterReset" hover-class="filter-btn-hover">重置</view>
+        <view class="filter-btn primary" bindtap="onFilterApply" hover-class="filter-btn-hover">应用筛选</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 二级筛选 · 按色料 -->
+  <view class="mask {{filterPigmentVisible ? 'show' : ''}}" bindtap="onPigmentFilterClose">
+    <view class="filter-panel filter-panel-tall {{filterPigmentVisible ? 'show' : ''}}" catchtap="noop">
+      <view class="filter-handle"></view>
+      <view class="filter-sub-header">
+        <text class="filter-back" bindtap="onPigmentFilterClose">‹</text>
+        <text class="filter-sub-title">按色料（单选）</text>
+      </view>
+
+      <view class="filter-search">
+        <input
+          class="filter-search-input"
+          placeholder="搜索色料代码（如 PR108）"
+          value="{{pigmentSearchKey}}"
+          bindinput="onPigmentSearchInput"
+        />
+      </view>
+
+      <scroll-view scroll-y class="filter-options-scroll" enhanced show-scrollbar="{{false}}">
+        <view
+          class="filter-option {{pigmentTempSelected === item.code ? 'selected' : ''}}"
+          wx:for="{{pigmentOptionsFiltered}}"
+          wx:key="code"
+          data-code="{{item.code}}"
+          bindtap="onPigmentOptionTap"
+          hover-class="filter-option-hover"
+        >
+          <view class="filter-option-text">
+            <text class="filter-option-code">{{item.code}}</text>
+            <text class="filter-option-count">{{item.count}} 个颜料</text>
+          </view>
+          <view class="radio {{pigmentTempSelected === item.code ? 'checked' : ''}}"></view>
+        </view>
+        <view class="filter-options-empty" wx:if="{{pigmentOptionsFiltered.length === 0}}">无匹配色料</view>
+      </scroll-view>
+
+      <view class="filter-actions">
+        <view class="filter-btn secondary" bindtap="onPigmentClear" hover-class="filter-btn-hover">清除</view>
+        <view class="filter-btn primary" bindtap="onPigmentConfirm" hover-class="filter-btn-hover">确定</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 二级筛选 · 按透明度 -->
+  <view class="mask {{filterTransparencyVisible ? 'show' : ''}}" bindtap="onTransparencyFilterClose">
+    <view class="filter-panel {{filterTransparencyVisible ? 'show' : ''}}" catchtap="noop">
+      <view class="filter-handle"></view>
+      <view class="filter-sub-header">
+        <text class="filter-back" bindtap="onTransparencyFilterClose">‹</text>
+        <text class="filter-sub-title">按透明度（单选）</text>
+      </view>
+
+      <view
+        class="trans-option {{transparencyTempSelected === item.value ? 'selected' : ''}}"
+        wx:for="{{transparencyOptions}}"
+        wx:key="value"
+        data-value="{{item.value}}"
+        bindtap="onTransparencyOptionTap"
+        hover-class="filter-option-hover"
+      >
+        <view class="trans-option-left">
+          <view class="trans-option-dot" style="background: {{item.dot}};"></view>
+          <view>
+            <view class="trans-option-cn">{{item.cn}}</view>
+            <view class="trans-option-en">{{item.value}} · {{item.count}} 个</view>
+          </view>
+        </view>
+        <view class="radio {{transparencyTempSelected === item.value ? 'checked' : ''}}"></view>
+      </view>
+
+      <view class="filter-actions">
+        <view class="filter-btn secondary" bindtap="onTransparencyClear" hover-class="filter-btn-hover">清除</view>
+        <view class="filter-btn primary" bindtap="onTransparencyConfirm" hover-class="filter-btn-hover">确定</view>
+      </view>
+    </view>
+  </view>
+</view>
