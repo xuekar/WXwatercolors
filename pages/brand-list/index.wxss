@@ -1962,3 +1962,212 @@
   font-size: 30rpx;
   line-height: 1;
 }
+
+/* ============ 今日签 → 保存为色彩方案（V4 新增） ============ */
+.lottery-save-section {
+  margin: 24rpx 24rpx 0;
+}
+.lottery-save-btn {
+  height: 96rpx;
+  border-radius: 16rpx;
+  background: #7C3FAA;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10rpx;
+  font-size: 28rpx;
+  font-weight: 500;
+  box-shadow: 0 8rpx 24rpx rgba(124, 63, 170, 0.25);
+  transition: opacity 0.2s ease;
+}
+.lottery-save-btn-hover {
+  opacity: 0.85;
+}
+.lottery-save-btn.disabled {
+  background: #E8DFF0;
+  color: #9C8AAB;
+  box-shadow: none;
+  pointer-events: none;
+}
+.lottery-save-icon {
+  font-size: 32rpx;
+  line-height: 1;
+  font-weight: 400;
+}
+
+/* 进度条卡片 */
+.lottery-save-meta {
+  margin-top: 16rpx;
+  padding: 18rpx 24rpx;
+  background: #FAF7FC;
+  border: 1rpx solid #ECE2F4;
+  border-radius: 14rpx;
+}
+.lottery-save-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10rpx;
+}
+.lottery-save-meta-label {
+  font-size: 22rpx;
+  color: #888;
+}
+.lottery-save-meta-count {
+  font-size: 26rpx;
+  font-weight: 500;
+  color: #2C2C2A;
+}
+.lottery-save-bar {
+  height: 8rpx;
+  background: #E5DAEF;
+  border-radius: 4rpx;
+  overflow: hidden;
+}
+.lottery-save-bar-fill {
+  height: 100%;
+  background: #7C3FAA;
+  border-radius: 4rpx;
+  transition: width 0.3s ease;
+}
+
+/* 命名 popup（底部抽屉） */
+.lottery-save-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #FFFFFF;
+  border-top-left-radius: 24rpx;
+  border-top-right-radius: 24rpx;
+  padding: 16rpx 32rpx 40rpx;
+  transform: translateY(100%);
+  transition: transform 0.28s ease;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+.lottery-save-panel.show { transform: translateY(0); }
+
+.lottery-save-title {
+  margin-top: 12rpx;
+  text-align: center;
+  font-size: 32rpx;
+  font-weight: 500;
+  color: #181818;
+}
+.lottery-save-subtitle {
+  margin-top: 8rpx;
+  text-align: center;
+  font-size: 24rpx;
+  color: #888;
+}
+
+.lottery-save-field-label {
+  margin-top: 32rpx;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 24rpx;
+  color: #555;
+  font-weight: 500;
+}
+.lottery-save-field-count {
+  font-size: 22rpx;
+  color: #999;
+  font-weight: 400;
+}
+.lottery-save-input {
+  margin-top: 12rpx;
+  height: 80rpx;
+  padding: 0 24rpx;
+  background: #FAF7FC;
+  border: 1rpx solid #7C3FAA;
+  border-radius: 14rpx;
+  font-size: 28rpx;
+  color: #181818;
+}
+
+.lottery-save-preview-label {
+  margin-top: 28rpx;
+  font-size: 24rpx;
+  color: #888;
+}
+.lottery-save-preview {
+  margin-top: 12rpx;
+  white-space: nowrap;
+  background: #FAF7FC;
+  border: 1rpx solid #ECE2F4;
+  border-radius: 12rpx;
+  padding: 14rpx;
+}
+.lottery-save-preview-item {
+  display: inline-block;
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 8rpx;
+  margin-right: 12rpx;
+  vertical-align: middle;
+  border: 1rpx solid rgba(0, 0, 0, 0.06);
+}
+
+.lottery-save-tip {
+  margin-top: 18rpx;
+  font-size: 22rpx;
+  color: #999;
+  min-height: 30rpx;
+}
+
+.lottery-save-actions {
+  margin-top: 28rpx;
+  display: flex;
+  gap: 16rpx;
+}
+.lottery-save-action-btn {
+  flex: 1;
+  height: 88rpx;
+  border-radius: 14rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  font-weight: 500;
+}
+.lottery-save-action-btn.secondary {
+  background: #FFFFFF;
+  border: 1rpx solid #DCDCDC;
+  color: #555;
+}
+.lottery-save-action-btn.primary {
+  background: #7C3FAA;
+  color: #FFFFFF;
+}
+.lottery-save-action-btn.primary.loading { opacity: 0.6; }
+
+/* 数量超限提示 */
+.lottery-limit-icon {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+  background: #FAEEDA;
+  color: #BA7517;
+  font-size: 44rpx;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16rpx;
+}
+.lottery-limit-desc {
+  font-size: 26rpx;
+  color: #555;
+  line-height: 1.6;
+  text-align: center;
+  margin: 16rpx 0 8rpx;
+}
+.rename-btn.lottery-limit-primary {
+  background: #7C3FAA;
+  color: #FFFFFF;
+  border: none;
+}

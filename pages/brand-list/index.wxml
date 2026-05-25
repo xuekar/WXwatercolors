@@ -305,6 +305,27 @@
             <text>重新抽签</text>
           </view>
         </view>
+
+        <!-- 保存为色彩方案（V4 新增，紫色主按钮 + 进度条） -->
+        <view wx:if="{{lotteryHasResult}}" class="lottery-save-section">
+          <view
+            class="lottery-save-btn {{lotterySaveDisabled ? 'disabled' : ''}}"
+            bindtap="onLotterySaveTap"
+            hover-class="{{lotterySaveDisabled ? '' : 'lottery-save-btn-hover'}}"
+          >
+            <text class="lottery-save-icon">{{lotterySaveDisabled ? '✓' : '+'}}</text>
+            <text>{{lotterySaveDisabled ? '已保存到色彩方' : '保存为色彩方案'}}</text>
+          </view>
+          <view class="lottery-save-meta">
+            <view class="lottery-save-meta-row">
+              <text class="lottery-save-meta-label">已保存方案</text>
+              <text class="lottery-save-meta-count">{{lotterySchemeCount}} / {{lotterySchemeMax}}</text>
+            </view>
+            <view class="lottery-save-bar">
+              <view class="lottery-save-bar-fill" style="width: {{lotterySchemeProgress}}%"></view>
+            </view>
+          </view>
+        </view>
       </view>
     </scroll-view>
   </block>
@@ -553,6 +574,66 @@
           bindtap="onSchemeRenameSave"
           hover-class="rename-btn-hover"
         >保存</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 今日签 → 保存为色彩方案 命名 popup（底部抽屉） -->
+  <view class="mask {{lotterySaveVisible ? 'show' : ''}}" bindtap="onLotterySaveClose">
+    <view class="lottery-save-panel {{lotterySaveVisible ? 'show' : ''}}" catchtap="noop">
+      <view class="filter-handle"></view>
+      <view class="lottery-save-title">保存为色彩方案</view>
+      <view class="lottery-save-subtitle">将本次 {{lotteryDrawn.length}} 色保存到「色彩方」</view>
+
+      <view class="lottery-save-field-label">
+        <text>方案名称</text>
+        <text class="lottery-save-field-count">{{lotterySaveInput.length}} / 5</text>
+      </view>
+      <input
+        class="lottery-save-input"
+        placeholder="请输入方案名称"
+        value="{{lotterySaveInput}}"
+        bindinput="onLotterySaveInput"
+        maxlength="5"
+        focus="{{lotterySaveVisible}}"
+        confirm-type="done"
+      />
+
+      <view class="lottery-save-preview-label">本次抽取颜色</view>
+      <scroll-view scroll-x class="lottery-save-preview" enhanced show-scrollbar="{{false}}">
+        <view
+          class="lottery-save-preview-item"
+          wx:for="{{lotteryDrawn}}"
+          wx:key="_gid"
+          style="background: {{item.swatch || '#FAFAFA'}}"
+        ></view>
+      </scroll-view>
+
+      <view class="lottery-save-tip">
+        <text wx:if="{{lotterySaveChecking}}" class="rename-checking">⏱ 安全检测中...</text>
+        <text wx:else>已用 {{lotterySchemeCount}} / {{lotterySchemeMax}} 个方案位</text>
+      </view>
+
+      <view class="lottery-save-actions">
+        <view class="lottery-save-action-btn secondary" bindtap="onLotterySaveClose" hover-class="rename-btn-hover">取消</view>
+        <view
+          class="lottery-save-action-btn primary {{lotterySaveChecking ? 'loading' : ''}}"
+          bindtap="onLotterySaveConfirm"
+          hover-class="rename-btn-hover"
+        >确认保存</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 今日签 → 方案数量已达上限 dialog -->
+  <view class="rename-mask {{lotterySaveLimitVisible ? 'show' : ''}}" bindtap="onLotterySaveLimitClose">
+    <view class="rename-dialog" catchtap="noop">
+      <view class="lottery-limit-icon">!</view>
+      <view class="rename-title">方案数量已达上限</view>
+      <view class="lottery-limit-desc">色彩方最多保存 {{lotterySchemeMax}} 个方案，当前已有 {{lotterySchemeCount}} 个，请先到「色彩方」删除至少 1 个方案后再保存。</view>
+      <view class="rename-actions">
+        <view class="rename-btn secondary" bindtap="onLotterySaveLimitClose" hover-class="rename-btn-hover">我知道了</view>
+        <view class="rename-btn lottery-limit-primary" bindtap="onLotterySaveLimitGoto" hover-class="rename-btn-hover">前往管理</view>
       </view>
     </view>
   </view>

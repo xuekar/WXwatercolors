@@ -97,6 +97,18 @@ Page({
     ownedPoolCount: 0,         // 当前已拥有数量（供初始态展示）
     lotteryAnimating: false,   // 抽签动画中
     lotteryEmpty: '',          // 边界提示（已拥有不足/去重过严）
+    lotterySchemeCount: 0,     // 当前已保存方案数（用于今日签结果页进度条）
+    lotterySchemeMax: 10,      // 方案上限
+    lotterySchemeProgress: 0,  // 进度条宽度百分比 0-100
+    lotterySaveDisabled: false, // 当前抽取结果是否已保存（保存后置灰禁用）
+
+    // 「保存方案」命名 popup
+    lotterySaveVisible: false,
+    lotterySaveInput: '',
+    lotterySaveChecking: false,
+
+    // 「方案数量超限」提示 dialog
+    lotterySaveLimitVisible: false,
 
     // ===== 色彩方 Color Scheme =====
     schemes: [],                // 全部方案数组
@@ -126,6 +138,7 @@ Page({
     this._updateLotteryMiniText();
     // 加载色彩方
     this._loadSchemes();
+    this._refreshLotterySchemeProgress();
     this.refresh();
   },
 
@@ -679,6 +692,21 @@ Page({
       history = wx.getStorageSync(this._LOTTERY_HISTORY_KEY) || [];
     } catch (e) {}
     this.setData({ lotteryHistory: Array.isArray(history) ? history : [] });
+    // 同步已保存方案数（用于结果页进度条）
+    this._refreshLotterySchemeProgress();
+  },
+
+  // 刷新今日签结果页的「已保存 X / 10」进度条
+  _refreshLotterySchemeProgress() {
+    const schemes = this.data.schemes || [];
+    const max = this._SCHEME_MAX_COUNT || 10;
+    const count = schemes.length;
+    const progress = Math.min(100, Math.round((count / max) * 100));
+    this.setData({
+      lotterySchemeCount: count,
+      lotterySchemeMax: max,
+      lotterySchemeProgress: progress,
+    });
   },
 
   // 配置：展开/折叠
@@ -807,6 +835,7 @@ Page({
         lotteryHistory: newHist,
         lotteryAnimating: false,
         lotteryEmpty,
+        lotterySaveDisabled: false,  // 新一次抽取，重新允许保存
       });
     }, 600);  // 0.6s 动画
   },
@@ -814,6 +843,107 @@ Page({
   // 重新抽签
   onLotteryRedraw() {
     this.onLotteryDraw();
+  },
+
+  // ===== 今日签 → 保存为色彩方案 =====
+  // 入口：点击结果页「保存方案」按钮
+  onLotterySaveTap() {
+    if (this.data.lotterySaveDisabled) return;
+    const drawn = this.data.lotteryDrawn || [];
+    if (drawn.length === 0) return;
+    // 数量上限拦截：≥10 直接弹超限提示，不进入命名步骤
+    const schemes = this.data.schemes || [];
+    if (schemes.length >= this._SCHEME_MAX_COUNT) {
+      this.setData({ lotterySaveLimitVisible: true });
+      return;
+    }
+    // 默认方案名：MM/DD 抽（最多 5 字，例 "5/25抽"）
+    const ts = this.data.lotteryDrawnAt || Date.now();
+    const d = new Date(ts);
+    const defaultName = `${d.getMonth() + 1}/${d.getDate()}抽`.slice(0, 5);
+    this.setData({
+      lotterySaveVisible: true,
+      lotterySaveInput: defaultName,
+      lotterySaveChecking: false,
+    });
+  },
+
+  onLotterySaveClose() {
+    this.setData({ lotterySaveVisible: false, lotterySaveChecking: false });
+  },
+
+  onLotterySaveInput(e) {
+    let v = e.detail.value || '';
+    if (v.length > 5) v = v.slice(0, 5);
+    this.setData({ lotterySaveInput: v });
+  },
+
+  onLotterySaveConfirm() {
+    const name = (this.data.lotterySaveInput || '').trim();
+    if (!name) {
+      this.showToast('名称不能为空');
+      return;
+    }
+    if (name.length > 5) {
+      this.showToast('名称最长 5 个字');
+      return;
+    }
+    if (this.data.lotterySaveChecking) return;
+    // 二次拦截上限（防止两次抽签间手动新增方案）
+    if ((this.data.schemes || []).length >= this._SCHEME_MAX_COUNT) {
+      this.setData({ lotterySaveVisible: false, lotterySaveLimitVisible: true });
+      return;
+    }
+    this.setData({ lotterySaveChecking: true });
+    this._msgSecCheck(name).then(pass => {
+      if (!pass) {
+        this.setData({ lotterySaveChecking: false });
+        this.showToast('名称含违规内容，请修改');
+        return;
+      }
+      this._persistLotteryAsScheme(name);
+    }).catch(() => {
+      this.setData({ lotterySaveChecking: false });
+      this.showToast('检测失败，请稍后重试');
+    });
+  },
+
+  // 把当前 lotteryDrawn 写入 schemes（与色彩方完全同结构）
+  _persistLotteryAsScheme(name) {
+    const drawn = this.data.lotteryDrawn || [];
+    const gids = drawn.map(p => p._gid).filter(Boolean);
+    const now = Date.now();
+    const newScheme = {
+      id: now,
+      name,
+      pigments: gids,
+      createdAt: now,
+      updatedAt: now,
+      savedAt: now,
+    };
+    const schemes = (this.data.schemes || []).concat([newScheme]);
+    this.setData({
+      schemes,
+      lotterySaveVisible: false,
+      lotterySaveChecking: false,
+      lotterySaveDisabled: true,  // 本次抽取已保存，按钮置灰
+    }, () => {
+      this._saveSchemes();
+      this._refreshLotterySchemeProgress();
+      this.showToast('已保存到色彩方');
+    });
+  },
+
+  // 超限提示：「我知道了」
+  onLotterySaveLimitClose() {
+    this.setData({ lotterySaveLimitVisible: false });
+  },
+
+  // 超限提示：「前往管理」→ 切到色彩方 TAB
+  onLotterySaveLimitGoto() {
+    this.setData({ lotterySaveLimitVisible: false, activeTab: 'scheme' }, () => {
+      this._enterScheme();
+    });
   },
 
   // 历史记录弹层
