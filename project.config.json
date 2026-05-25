@@ -10,9 +10,9 @@
     "urlCheck": false,
     "scopeDataCheck": false,
     "coverView": true,
-    "es6": false,
+    "es6": true,
     "postcss": true,
-    "enhance": false,
+    "enhance": true,
     "compileHotReLoad": false,
     "lazyloadPlaceholderEnable": false,
     "preloadBackgroundData": false,
@@ -56,5 +56,6 @@
     "tabIndent": "insertSpaces",
     "tabSize": 2
   },
-  "simulatorPluginLibVersion": {}
+  "simulatorPluginLibVersion": {},
+  "cloudfunctionTemplateRoot": "cloudfunctionTemplate/"
 }
