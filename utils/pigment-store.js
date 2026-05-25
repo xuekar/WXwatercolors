@@ -12,28 +12,33 @@ const PIGMENT_LOADERS = {
 
 const _pigmentsCache = {};
 
-function _syncOwnedCount(brandId, list) {
+function _syncCounts(brandId, list) {
   const app = getApp();
   if (!app) return;
   if (!app.globalData) app.globalData = {};
   if (!app.globalData.ownedCounts) app.globalData.ownedCounts = {};
-  let owned = 0;
-  for (const p of list) if (p.owned) owned++;
+  if (!app.globalData.wishlistCounts) app.globalData.wishlistCounts = {};
+  let owned = 0, wish = 0;
+  for (const p of list) {
+    if (p.owned) owned++;
+    if (p.wishlist) wish++;
+  }
   app.globalData.ownedCounts[brandId] = owned;
+  app.globalData.wishlistCounts[brandId] = wish;
 }
 
 function _loadAsync(brandId) {
   return new Promise((resolve, reject) => {
-    console.log('[pigment-store] schedule', brandId, Date.now());
     setTimeout(() => {
-      console.log('[pigment-store] tick fired', brandId, Date.now());
       try {
         if (!_pigmentsCache[brandId]) {
-          console.log('[pigment-store] require start', Date.now());
           const loader = PIGMENT_LOADERS[brandId];
           const src = loader ? loader() : [];
-          console.log('[pigment-store] require done len=', src.length, Date.now());
-          _pigmentsCache[brandId] = src.map(p => ({ ...p }));
+          // 初始化时补 wishlist 字段（默认 false）
+          _pigmentsCache[brandId] = src.map(p => ({
+            ...p,
+            wishlist: !!p.wishlist,
+          }));
         }
         resolve(_pigmentsCache[brandId].map(p => ({ ...p })));
       } catch (err) {
@@ -50,7 +55,11 @@ module.exports = {
   },
   savePigments(brandId, list) {
     const id = Number(brandId);
-    _pigmentsCache[id] = list.map(p => ({ ...p }));
-    _syncOwnedCount(id, _pigmentsCache[id]);
+    // 强制：owned=true 时 wishlist 必为 false（互斥规则）
+    _pigmentsCache[id] = list.map(p => ({
+      ...p,
+      wishlist: p.owned ? false : !!p.wishlist,
+    }));
+    _syncCounts(id, _pigmentsCache[id]);
   },
 };
