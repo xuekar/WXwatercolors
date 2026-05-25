@@ -84,9 +84,27 @@ Page({
 
     toastVisible: false,
     toastText: '',
+
+    // ===== 今日签 =====
+    lotteryConfig: { dedupDays: 3, count: 3 },  // X 日不重复，Y 抽取数量
+    lotteryDrawn: [],          // 当前抽中的颜料列表（含 _brandColor/_brandAbbr/_brandCn）
+    lotteryHasResult: false,   // 是否已经抽过（决定显示初始态还是结果态）
+    lotteryHistory: [],        // 抽签历史（最近 30 次）
+    lotteryHistoryVisible: false,
+    lotteryDrawnAt: 0,         // 本次抽取时间戳
+    ownedPoolCount: 0,         // 当前已拥有数量（供初始态展示）
+    lotteryAnimating: false,   // 抽签动画中
+    lotteryEmpty: '',          // 边界提示（已拥有不足/去重过严）
   },
 
   onLoad() {
+    // 加载今日签配置
+    try {
+      const cfg = wx.getStorageSync('wc_lottery_config_v1');
+      if (cfg && typeof cfg === 'object') {
+        this.setData({ lotteryConfig: { dedupDays: cfg.dedupDays, count: cfg.count || 3 } });
+      }
+    } catch (e) {}
     this.refresh();
   },
 
@@ -95,6 +113,8 @@ Page({
       this.refresh();
       if (this.data.activeTab === 'library') {
         this._reloadLibraryDataIfNeeded();
+      } else if (this.data.activeTab === 'lottery') {
+        this._refreshLotteryPool();
       }
     } else {
       this._loaded = true;
@@ -114,6 +134,8 @@ Page({
     this.setData({ activeTab: tab }, () => {
       if (tab === 'library') {
         this._enterLibrary();
+      } else if (tab === 'lottery') {
+        this._enterLottery();
       } else {
         this.applyFilter();
       }
@@ -133,9 +155,8 @@ Page({
   },
   applyFilter() {
     const { activeTab, sortType, brandList } = this.data;
-    if (activeTab === 'library') return;
+    if (activeTab !== 'all') return;
     let list = brandList.slice();
-    if (activeTab === 'unowned') list = list.filter(b => !b.owned || b.ownedCount < b.totalCount);
     if (sortType === 'name') {
       list.sort((a, b) => a.nameCn.localeCompare(b.nameCn, 'zh-CN'));
     } else {
@@ -593,6 +614,189 @@ Page({
     this.setData({ toastVisible: true, toastText: text });
     clearTimeout(this._toastTimer);
     this._toastTimer = setTimeout(() => this.setData({ toastVisible: false }), 1500);
+  },
+
+  // ============ 今日签 ============
+  _LOTTERY_HISTORY_KEY: 'wc_lottery_history_v1',
+  _LOTTERY_CONFIG_KEY: 'wc_lottery_config_v1',
+  _LOTTERY_LAST_DRAWN_KEY: 'wc_lottery_last_drawn_v1',  // { pigmentGid: timestamp }
+
+  _enterLottery() {
+    if (!this._allPigments) {
+      this.setData({ libLoading: true });
+      pigmentStore.getAllPigmentsAsync().then(all => {
+        const brandsMeta = dataStore.getBrandsMeta();
+        const brandMap = {};
+        brandsMeta.forEach(b => { brandMap[b.id] = b; });
+        all.forEach(p => {
+          const b = brandMap[p.brandId];
+          p._brandColor = b ? b.color : '#888';
+          p._brandAbbr = b ? b.iconText : '';
+          p._brandCn = b ? b.nameCn : '';
+        });
+        this._allPigments = all;
+        this.setData({ libLoading: false, brandsMeta }, () => this._refreshLotteryPool());
+      });
+    } else {
+      this._refreshLotteryPool();
+    }
+  },
+
+  _refreshLotteryPool() {
+    const all = this._allPigments || [];
+    const owned = all.filter(p => p.owned);
+    this.setData({ ownedPoolCount: owned.length });
+    // 加载历史
+    let history = [];
+    try {
+      history = wx.getStorageSync(this._LOTTERY_HISTORY_KEY) || [];
+    } catch (e) {}
+    this.setData({ lotteryHistory: Array.isArray(history) ? history : [] });
+  },
+
+  // 配置：步进器
+  onLotteryDedupChange(e) {
+    const { delta } = e.currentTarget.dataset;
+    const cur = this.data.lotteryConfig.dedupDays;
+    const next = Math.max(1, Math.min(7, (cur || 0) + Number(delta)));
+    const cfg = { ...this.data.lotteryConfig, dedupDays: next };
+    this.setData({ lotteryConfig: cfg });
+    this._saveLotteryConfig();
+  },
+  onLotteryDedupClear() {
+    const cfg = { ...this.data.lotteryConfig, dedupDays: null };
+    this.setData({ lotteryConfig: cfg });
+    this._saveLotteryConfig();
+  },
+  onLotteryCountChange(e) {
+    const { delta } = e.currentTarget.dataset;
+    const cur = this.data.lotteryConfig.count || 3;
+    const next = Math.max(1, Math.min(9, cur + Number(delta)));
+    const cfg = { ...this.data.lotteryConfig, count: next };
+    this.setData({ lotteryConfig: cfg });
+    this._saveLotteryConfig();
+  },
+  _saveLotteryConfig() {
+    try {
+      wx.setStorageSync(this._LOTTERY_CONFIG_KEY, this.data.lotteryConfig);
+    } catch (e) {}
+  },
+
+  // 抽签！
+  onLotteryDraw() {
+    if (this.data.lotteryAnimating) return;
+    const all = this._allPigments || [];
+    const owned = all.filter(p => p.owned);
+    const Y = this.data.lotteryConfig.count || 3;
+    const X = this.data.lotteryConfig.dedupDays;  // null 表示不去重
+
+    if (owned.length === 0) {
+      this.showToast('请先标记已拥有的颜料');
+      return;
+    }
+
+    // 去重过滤
+    let lastDrawnMap = {};
+    try {
+      lastDrawnMap = wx.getStorageSync(this._LOTTERY_LAST_DRAWN_KEY) || {};
+    } catch (e) {}
+    const now = Date.now();
+    let pool = owned;
+    if (X) {
+      const ms = X * 24 * 60 * 60 * 1000;
+      pool = owned.filter(p => {
+        const t = lastDrawnMap[p._gid] || 0;
+        return now - t > ms;
+      });
+    }
+
+    // 候选不足处理
+    if (pool.length === 0) {
+      this.showToast(`最近 ${X} 天已抽完所有已拥有，调整去重天数后再试`);
+      return;
+    }
+
+    const drawCount = Math.min(Y, pool.length);
+
+    // 抽签动画
+    this.setData({ lotteryAnimating: true });
+    setTimeout(() => {
+      // 随机抽 drawCount 个（Fisher-Yates 洗牌）
+      const arr = pool.slice();
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      const drawn = arr.slice(0, drawCount).map(p => ({ ...p }));
+
+      // 写入 lastDrawn
+      drawn.forEach(p => { lastDrawnMap[p._gid] = now; });
+      try {
+        wx.setStorageSync(this._LOTTERY_LAST_DRAWN_KEY, lastDrawnMap);
+      } catch (e) {}
+
+      // 写入历史
+      const hist = (this.data.lotteryHistory || []).slice();
+      const d = new Date(now);
+      const pad = (n) => (n < 10 ? '0' + n : '' + n);
+      const timeStr = `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      hist.unshift({
+        time: timeStr,
+        ts: now,
+        count: drawn.length,
+        gids: drawn.map(p => p._gid),
+        names: drawn.map(p => p.nameCn).join(' · '),
+      });
+      const newHist = hist.slice(0, 30);
+      try {
+        wx.setStorageSync(this._LOTTERY_HISTORY_KEY, newHist);
+      } catch (e) {}
+
+      // 检查是否实际抽数 < Y（用于提示）
+      let lotteryEmpty = '';
+      if (drawCount < Y) {
+        lotteryEmpty = `候选池仅有 ${drawCount} 个可抽，已为你抽出全部`;
+      }
+
+      this.setData({
+        lotteryDrawn: drawn,
+        lotteryHasResult: true,
+        lotteryDrawnAt: now,
+        lotteryHistory: newHist,
+        lotteryAnimating: false,
+        lotteryEmpty,
+      });
+    }, 600);  // 0.6s 动画
+  },
+
+  // 重新抽签
+  onLotteryRedraw() {
+    this.onLotteryDraw();
+  },
+
+  // 历史记录弹层
+  onLotteryHistoryTap() {
+    this.setData({ lotteryHistoryVisible: true });
+  },
+  onLotteryHistoryClose() {
+    this.setData({ lotteryHistoryVisible: false });
+  },
+
+  // 点击色卡 → 拉起 V4 详情抽屉
+  onLotteryCardTap(e) {
+    const { gid } = e.currentTarget.dataset;
+    const item = (this.data.lotteryDrawn || []).find(p => p._gid === gid);
+    if (!item) return;
+    const brandsMeta = this.data.brandsMeta || [];
+    const brand = brandsMeta.find(b => b.id === item.brandId) || { color: '#888', iconText: '?', nameCn: '' };
+    const trans = TRANSPARENCY_COLOR[item.transparency] || { dot: '#CCCCCC', cn: item.transparency || '—' };
+    this.setData({
+      drawerVisible: true,
+      drawerPigment: { ...item },
+      drawerBrand: brand,
+      drawerTransCn: trans.cn,
+      drawerTransDot: trans.dot,
+    });
   },
 
   noop() {},

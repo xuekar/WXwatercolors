@@ -20,17 +20,17 @@
       <view class="tab-bar"></view>
     </view>
     <view
-      class="tab {{activeTab === 'unowned' ? 'active' : ''}}"
-      data-tab="unowned"
+      class="tab {{activeTab === 'lottery' ? 'active lottery' : ''}}"
+      data-tab="lottery"
       bindtap="onTabChange"
     >
-      <view class="tab-label">未拥有</view>
+      <view class="tab-label">今日签</view>
       <view class="tab-bar"></view>
     </view>
   </view>
 
-  <!-- ============ 模式 1：品牌视图（全部品牌 / 未拥有 Tab） ============ -->
-  <block wx:if="{{activeTab !== 'library'}}">
+  <!-- ============ 模式 1：品牌视图（全部品牌） ============ -->
+  <block wx:if="{{activeTab === 'all'}}">
     <view class="filter-bar">
       <view class="filter-item" bindtap="onSortTap">
         <text class="filter-label">排序</text>
@@ -195,6 +195,128 @@
       </view>
     </scroll-view>
   </block>
+
+  <!-- ============ 模式 3：今日签 ============ -->
+  <block wx:if="{{activeTab === 'lottery'}}">
+    <scroll-view scroll-y class="lottery-scroll" enhanced show-scrollbar="{{false}}">
+      <view class="lottery-page">
+
+        <!-- 条件设置（详细型，仅初始态） -->
+        <view wx:if="{{!lotteryHasResult}}" class="lottery-config">
+          <view class="lottery-config-row">
+            <view class="lottery-config-label">
+              <view class="lottery-config-main">
+                <text wx:if="{{lotteryConfig.dedupDays}}"><text class="lottery-num">{{lotteryConfig.dedupDays}}</text> 日内不重复</text>
+                <text wx:else>不限重复</text>
+              </view>
+              <view class="lottery-config-sub">同一颜料 N 天内不会再被抽中</view>
+            </view>
+            <view class="lottery-stepper">
+              <view class="lottery-stepper-btn" data-delta="-1" bindtap="onLotteryDedupChange">−</view>
+              <view class="lottery-stepper-value">{{lotteryConfig.dedupDays || '—'}}</view>
+              <view class="lottery-stepper-btn" data-delta="1" bindtap="onLotteryDedupChange">+</view>
+            </view>
+            <view class="lottery-clear-btn" bindtap="onLotteryDedupClear">不限</view>
+          </view>
+          <view class="lottery-config-divider"></view>
+          <view class="lottery-config-row">
+            <view class="lottery-config-label">
+              <view class="lottery-config-main">抽取数量 <text class="lottery-num">{{lotteryConfig.count}}</text></view>
+              <view class="lottery-config-sub">每次抽取 1 ~ 9 个颜料</view>
+            </view>
+            <view class="lottery-stepper">
+              <view class="lottery-stepper-btn" data-delta="-1" bindtap="onLotteryCountChange">−</view>
+              <view class="lottery-stepper-value">{{lotteryConfig.count}}</view>
+              <view class="lottery-stepper-btn" data-delta="1" bindtap="onLotteryCountChange">+</view>
+            </view>
+          </view>
+        </view>
+
+        <!-- 紧凑条件条（已抽签后） -->
+        <view wx:else class="lottery-config-mini">
+          <text class="lottery-config-mini-text">
+            <text wx:if="{{lotteryConfig.dedupDays}}"><text class="lottery-num">{{lotteryConfig.dedupDays}}</text> 日不重复 · </text>
+            <text wx:else>不限重复 · </text>
+            抽取 <text class="lottery-num">{{lotteryConfig.count}}</text> 个 · 已拥有 <text class="lottery-num">{{ownedPoolCount}}</text> 个
+          </text>
+        </view>
+
+        <!-- 抽取结果区（已抽签后） -->
+        <view wx:if="{{lotteryHasResult}}" class="lottery-result">
+          <view class="lottery-result-header">
+            <view class="lottery-result-title">
+              <text class="lottery-result-mark">签</text>今日抽中
+            </view>
+            <view class="lottery-result-meta">共 {{lotteryDrawn.length}} 个</view>
+          </view>
+          <view wx:if="{{lotteryEmpty}}" class="lottery-result-warn">{{lotteryEmpty}}</view>
+          <view class="lottery-grid">
+            <view
+              class="lottery-card"
+              wx:for="{{lotteryDrawn}}"
+              wx:key="_gid"
+              data-gid="{{item._gid}}"
+              bindtap="onLotteryCardTap"
+              hover-class="lottery-card-hover"
+              hover-stay-time="80"
+            >
+              <view class="lottery-swatch" style="background: {{item.swatch || '#FAFAFA'}}">
+                <text class="lottery-brand-badge">{{item._brandAbbr}}</text>
+              </view>
+              <view class="lottery-name">{{item.nameCn}}</view>
+            </view>
+          </view>
+        </view>
+
+        <!-- 中央抽签按钮（仅初始态） -->
+        <view wx:if="{{!lotteryHasResult}}" class="lottery-center">
+          <view class="lottery-hint">点 击 抽 签</view>
+          <view
+            class="lottery-btn {{ownedPoolCount === 0 ? 'disabled' : ''}} {{lotteryAnimating ? 'animating' : ''}}"
+            bindtap="onLotteryDraw"
+            hover-class="lottery-btn-hover"
+            hover-stay-time="80"
+          >
+            <text class="lottery-btn-text">抽</text>
+          </view>
+          <view class="lottery-pool-hint">
+            <text wx:if="{{ownedPoolCount > 0}}">已拥有 <text class="lottery-num">{{ownedPoolCount}}</text> 个颜料 · 可抽取池</text>
+            <text wx:else class="lottery-pool-empty">先去标记几个已拥有的颜料 →</text>
+          </view>
+        </view>
+
+        <!-- 底部操作（结果态） -->
+        <view wx:if="{{lotteryHasResult}}" class="lottery-redraw-bar">
+          <view class="lottery-redraw-btn secondary" bindtap="onLotteryHistoryTap" hover-class="action-hover">
+            <text class="lottery-redraw-icon">📋</text>
+            <text>抽签历史</text>
+          </view>
+          <view class="lottery-redraw-btn primary {{lotteryAnimating ? 'animating' : ''}}" bindtap="onLotteryRedraw" hover-class="action-hover">
+            <text class="lottery-redraw-icon">↻</text>
+            <text>重新抽签</text>
+          </view>
+        </view>
+      </view>
+    </scroll-view>
+  </block>
+
+  <!-- 抽签历史弹层 -->
+  <view class="mask {{lotteryHistoryVisible ? 'show' : ''}}" bindtap="onLotteryHistoryClose">
+    <view class="filter-panel filter-panel-tall {{lotteryHistoryVisible ? 'show' : ''}}" catchtap="noop">
+      <view class="filter-handle"></view>
+      <view class="filter-sub-header">
+        <text class="filter-back" bindtap="onLotteryHistoryClose">‹</text>
+        <text class="filter-sub-title">抽签历史（最近 30 次）</text>
+      </view>
+      <scroll-view scroll-y class="filter-options-scroll">
+        <view class="lottery-hist-item" wx:for="{{lotteryHistory}}" wx:key="time">
+          <view class="lottery-hist-time">{{item.count}} 个 · {{item.time}}</view>
+          <view class="lottery-hist-names">{{item.names}}</view>
+        </view>
+        <view class="filter-options-empty" wx:if="{{lotteryHistory.length === 0}}">还没有抽签记录</view>
+      </scroll-view>
+    </view>
+  </view>
 
   <!-- 排序弹层（品牌视图用） -->
   <view class="mask {{sortVisible ? 'show' : ''}}" bindtap="onSortClose">
