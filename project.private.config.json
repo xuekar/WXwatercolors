@@ -1,6 +1,8 @@
 {
   "miniprogramRoot": "./",
   "projectname": "watercolors",
+  "cloudfunctionRoot": "cloudfunctions/",
+  "cloudbaseRoot": "",
   "setting": {
     "compileHotReLoad": false,
     "urlCheck": false,
