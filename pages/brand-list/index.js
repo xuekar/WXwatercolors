@@ -857,10 +857,10 @@ Page({
       this.setData({ lotterySaveLimitVisible: true });
       return;
     }
-    // 默认方案名：MM/DD 存（最多 5 字，例 "5/25存"）
+    // 默认方案名：MMDD签（最多 5 字，例 "525签" / "1225签"）
     const ts = this.data.lotteryDrawnAt || Date.now();
     const d = new Date(ts);
-    const defaultName = `${d.getMonth() + 1}/${d.getDate()}存`.slice(0, 5);
+    const defaultName = `${d.getMonth() + 1}${d.getDate()}签`.slice(0, 5);
     this.setData({
       lotterySaveVisible: true,
       lotterySaveInput: defaultName,
