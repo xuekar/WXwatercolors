@@ -12,7 +12,7 @@ App({
     // 若未开通云开发，会自动降级（_msgSecCheck 中已做容错）
     if (wx.cloud) {
       try {
-        wx.cloud.init({ env: 'cloud1', traceUser: true });
+        wx.cloud.init({ env: 'cloud1-d6gd6kerl873e0d0c', traceUser: true });
         this.globalData.cloudInited = true;
         console.log('[app] wx.cloud 初始化成功');
       } catch (err) {
