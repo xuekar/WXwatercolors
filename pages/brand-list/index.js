@@ -666,22 +666,23 @@ Page({
   _updateLotteryMiniText() {
     const { dedupDays, count } = this.data.lotteryConfig;
     const ownedCount = this.data.ownedPoolCount || 0;
-    const dedupPart = dedupDays ? `${dedupDays} 日内不重复` : '不限重复';
+    const dedupPart = dedupDays > 0 ? `${dedupDays} 日内不重复` : '当天可重复';
     const text = `${dedupPart} · 抽取 ${count} 个 · 总 ${ownedCount} 个`;
     this.setData({ lotteryConfigMiniText: text });
   },
 
-  // 配置：步进器
+  // 配置：步进器 — X 日内不重复（0-7，0 表示当天可重复）
   onLotteryDedupChange(e) {
     const { delta } = e.currentTarget.dataset;
-    const cur = this.data.lotteryConfig.dedupDays;
-    const next = Math.max(1, Math.min(7, (cur || 0) + Number(delta)));
+    const cur = this.data.lotteryConfig.dedupDays || 0;
+    const next = Math.max(0, Math.min(7, cur + Number(delta)));
     const cfg = { ...this.data.lotteryConfig, dedupDays: next };
     this.setData({ lotteryConfig: cfg }, () => this._updateLotteryMiniText());
     this._saveLotteryConfig();
   },
+  // 「不限」入口已移除（X=0 即等同不限）
   onLotteryDedupClear() {
-    const cfg = { ...this.data.lotteryConfig, dedupDays: null };
+    const cfg = { ...this.data.lotteryConfig, dedupDays: 0 };
     this.setData({ lotteryConfig: cfg }, () => this._updateLotteryMiniText());
     this._saveLotteryConfig();
   },
@@ -705,7 +706,7 @@ Page({
     const all = this._allPigments || [];
     const owned = all.filter(p => p.owned);
     const Y = this.data.lotteryConfig.count || 3;
-    const X = this.data.lotteryConfig.dedupDays;  // null 表示不去重
+    const X = this.data.lotteryConfig.dedupDays;  // 0 或 null 表示不去重
 
     if (owned.length === 0) {
       this.showToast('请先标记已拥有的颜料');
@@ -719,7 +720,7 @@ Page({
     } catch (e) {}
     const now = Date.now();
     let pool = owned;
-    if (X) {
+    if (X && X > 0) {
       const ms = X * 24 * 60 * 60 * 1000;
       pool = owned.filter(p => {
         const t = lastDrawnMap[p._gid] || 0;

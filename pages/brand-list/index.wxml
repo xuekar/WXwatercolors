@@ -219,23 +219,20 @@
           <view class="lottery-config-row">
             <view class="lottery-config-label">
               <view class="lottery-config-main">
-                <text wx:if="{{lotteryConfig.dedupDays}}"><text class="lottery-num">{{lotteryConfig.dedupDays}}</text> 日内不重复</text>
-                <text wx:else>不限重复</text>
+                <text wx:if="{{lotteryConfig.dedupDays > 0}}"><text class="lottery-num">{{lotteryConfig.dedupDays}}</text> 日内不重复</text>
+                <text wx:else><text class="lottery-num">0</text> 日不重复（当天可重复）</text>
               </view>
-              <view class="lottery-config-sub">同一颜料 N 天内不会再被抽中</view>
             </view>
             <view class="lottery-stepper">
               <view class="lottery-stepper-btn" data-delta="-1" bindtap="onLotteryDedupChange">−</view>
-              <view class="lottery-stepper-value">{{lotteryConfig.dedupDays || '—'}}</view>
+              <view class="lottery-stepper-value">{{lotteryConfig.dedupDays}}</view>
               <view class="lottery-stepper-btn" data-delta="1" bindtap="onLotteryDedupChange">+</view>
             </view>
-            <view class="lottery-clear-btn" bindtap="onLotteryDedupClear">不限</view>
           </view>
           <view class="lottery-config-divider"></view>
           <view class="lottery-config-row">
             <view class="lottery-config-label">
               <view class="lottery-config-main">抽取数量 <text class="lottery-num">{{lotteryConfig.count}}</text></view>
-              <view class="lottery-config-sub">每次抽取 1 ~ 9 个颜料</view>
             </view>
             <view class="lottery-stepper">
               <view class="lottery-stepper-btn" data-delta="-1" bindtap="onLotteryCountChange">−</view>
