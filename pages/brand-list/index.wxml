@@ -361,11 +361,14 @@
           <view class="scheme-meta">{{schemes.length}} / 10</view>
         </scroll-view>
 
-        <!-- 方案标题 + 编辑 + 删除 -->
-        <view class="scheme-header" wx:if="{{activeScheme}}">
+        <!-- 方案标题 + 编辑/删除/已保存徽章 -->
+        <view class="scheme-header {{activeScheme.isSaved ? 'saved' : ''}}" wx:if="{{activeScheme}}">
           <view class="scheme-title-row">
             <view class="scheme-title">{{activeScheme.name}}</view>
-            <view class="scheme-title-edit-btn" bindtap="onSchemeRenameOpen" hover-class="scheme-icon-hover">✎</view>
+            <!-- 编辑态显示 ✎ 重命名按钮 -->
+            <view wx:if="{{!activeScheme.isSaved}}" class="scheme-title-edit-btn" bindtap="onSchemeRenameOpen" hover-class="scheme-icon-hover">✎</view>
+            <!-- 已保存态显示 ✓ 已保存徽章 -->
+            <view wx:else class="scheme-saved-badge">✓ 已保存</view>
             <view class="scheme-title-delete-btn" bindtap="onSchemeDeleteCurrent" hover-class="scheme-icon-hover">🗑</view>
           </view>
           <view class="scheme-stat">
@@ -373,6 +376,7 @@
             <text class="scheme-num">{{activeScheme.ownedCount}}</text> 已拥有 ·
             <text class="scheme-num scheme-num-warn">{{activeScheme.unownedCount}}</text> 未拥有 · 上限 48
           </view>
+          <view wx:if="{{activeScheme.isSaved}}" class="scheme-stat-saved">最后保存：{{activeScheme.savedAtStr}}</view>
         </view>
 
         <!-- 颜料网格 -->
@@ -383,7 +387,9 @@
               wx:for="{{activeScheme.pigmentsList}}"
               wx:key="_gid"
             >
+              <!-- 仅编辑态显示 × 删除按钮 -->
               <view
+                wx:if="{{!activeScheme.isSaved}}"
                 class="scheme-card-delete"
                 data-gid="{{item._gid}}"
                 catchtap="onSchemeRemovePigment"
@@ -396,9 +402,9 @@
               <view class="scheme-name">{{item.nameCn}}</view>
               <view class="scheme-color-no">{{item.colorNo}}</view>
             </view>
-            <!-- 添加占位（未达上限时显示） -->
+            <!-- 添加占位卡（仅编辑态 + 未达上限时显示） -->
             <view
-              wx:if="{{activeScheme.canAdd}}"
+              wx:if="{{!activeScheme.isSaved && activeScheme.canAdd}}"
               class="scheme-card-add"
               bindtap="onSchemeAddBrandOpen"
               hover-class="scheme-card-add-hover"
@@ -407,10 +413,43 @@
               <view class="scheme-card-add-text">添加颜料</view>
             </view>
           </view>
-          <view wx:if="{{!activeScheme.canAdd}}" class="scheme-limit-tip">
+          <view wx:if="{{!activeScheme.isSaved && !activeScheme.canAdd}}" class="scheme-limit-tip">
             ⚠ 此方案已达 48 个上限，删除一些颜料才能继续添加
           </view>
+          <!-- 已保存态空方案兜底 -->
+          <view wx:if="{{activeScheme.isSaved && activeScheme.pigmentsList.length === 0}}" class="scheme-saved-empty">
+            该方案暂无颜料，点击「修改方案」添加
+          </view>
+          <!-- 占位避免 footer-bar 遮挡 -->
+          <view style="height: 120rpx;"></view>
         </scroll-view>
+
+        <!-- 底部操作栏：编辑态 vs 已保存态 -->
+        <view class="scheme-footer" wx:if="{{activeScheme}}">
+          <!-- 编辑态：保存方案 -->
+          <block wx:if="{{!activeScheme.isSaved}}">
+            <view class="scheme-footer-tip">还未保存 · 离开页面将丢失改动</view>
+            <view class="scheme-footer-bar">
+              <view class="scheme-footer-btn primary" bindtap="onSchemeSave" hover-class="scheme-footer-btn-hover">
+                <text class="scheme-footer-icon">💾</text>
+                <text>保存方案</text>
+              </view>
+            </view>
+          </block>
+          <!-- 已保存态：分享 + 修改方案 -->
+          <block wx:else>
+            <view class="scheme-footer-bar">
+              <view class="scheme-footer-btn gray" bindtap="onSchemeShare" hover-class="scheme-footer-btn-hover">
+                <text class="scheme-footer-icon">📤</text>
+                <text>分享</text>
+              </view>
+              <view class="scheme-footer-btn outline" bindtap="onSchemeEnterEdit" hover-class="scheme-footer-btn-hover">
+                <text class="scheme-footer-icon">✎</text>
+                <text>修改方案</text>
+              </view>
+            </view>
+          </block>
+        </view>
       </block>
     </view>
   </block>

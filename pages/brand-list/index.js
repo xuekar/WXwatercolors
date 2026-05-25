@@ -916,6 +916,14 @@ Page({
     const pigments = (cur.pigments || []).map(gid => pigmentMap[gid]).filter(Boolean);
     const ownedCount = pigments.filter(p => p.owned).length;
     const unownedCount = pigments.length - ownedCount;
+    // 已保存判断：savedAt 存在 且 updatedAt <= savedAt
+    const isSaved = !!cur.savedAt && (!(cur.updatedAt) || cur.updatedAt <= cur.savedAt);
+    let savedAtStr = '';
+    if (cur.savedAt) {
+      const d = new Date(cur.savedAt);
+      const pad = (n) => (n < 10 ? '0' + n : '' + n);
+      savedAtStr = `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
     this.setData({
       activeSchemeId: cur.id,
       activeScheme: {
@@ -924,6 +932,9 @@ Page({
         ownedCount,
         unownedCount,
         canAdd: pigments.length < this._SCHEME_PIGMENT_MAX,
+        isSaved,
+        isDirty: !isSaved,
+        savedAtStr,
       },
     });
   },
@@ -955,6 +966,45 @@ Page({
     this.setData({ schemes: newList, activeSchemeId: newScheme.id }, () => {
       this._saveSchemes();
       this._refreshActiveScheme();
+    });
+  },
+
+  // ===== 保存方案：写入 savedAt，进入「已保存」只读态 =====
+  onSchemeSave() {
+    const id = this.data.activeSchemeId;
+    if (!id) return;
+    const now = Date.now();
+    const schemes = this.data.schemes.map(s =>
+      s.id === id ? { ...s, savedAt: now, updatedAt: now } : s
+    );
+    this.setData({ schemes }, () => {
+      this._saveSchemes();
+      this._refreshActiveScheme();
+      this.showToast('已保存');
+    });
+  },
+
+  // ===== 进入编辑态：仅切 UI，不改 storage（清除 savedAt 让 isSaved=false） =====
+  onSchemeEnterEdit() {
+    const id = this.data.activeSchemeId;
+    if (!id) return;
+    const schemes = this.data.schemes.map(s =>
+      s.id === id ? { ...s, savedAt: null, updatedAt: Date.now() } : s
+    );
+    this.setData({ schemes }, () => {
+      this._saveSchemes();
+      this._refreshActiveScheme();
+    });
+  },
+
+  // ===== 分享方案（占位：使用 wx.showShareMenu / showActionSheet）=====
+  onSchemeShare() {
+    const cur = this.data.activeScheme;
+    if (!cur) return;
+    const names = (cur.pigmentsList || []).map(p => `${p._brandAbbr} ${p.colorNo} ${p.nameCn}`).join('\n');
+    wx.setClipboardData({
+      data: `${cur.name}\n共 ${cur.pigmentsList.length} 个颜料\n\n${names}`,
+      success: () => this.showToast('方案已复制到剪贴板'),
     });
   },
 
