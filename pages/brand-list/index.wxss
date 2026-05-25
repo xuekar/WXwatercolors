@@ -978,3 +978,387 @@
   background: #F0F5FF;
   opacity: 0.9;
 }
+
+/* ===================== 今日签 Daily Lottery ===================== */
+.lottery-scroll {
+  flex: 1; height: 0;
+  background: linear-gradient(180deg, #FFFAF0 0%, #FFF5E0 16%, #F5F5F5 60%);
+}
+.lottery-page { padding: 0 0 32rpx; }
+
+/* 中式装饰：金色调 */
+.tab.active.lottery .tab-bar { background: #C9A86A !important; }
+.tab.active.lottery .tab-label { color: #181818; }
+
+.lottery-num {
+  color: #C9A86A;
+  font-weight: 700;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  margin: 0 2rpx;
+}
+
+/* 紧凑条内的 lottery-num 不要外边距（避免挤断行） */
+.lottery-config-mini .lottery-num {
+  margin: 0 1rpx;
+}
+
+/* 详细配置卡（初始态） */
+.lottery-config {
+  margin: 24rpx 24rpx 0;
+  background: #FFFFFF;
+  border-radius: 24rpx;
+  padding: 24rpx 28rpx;
+  box-shadow: 0 4rpx 16rpx rgba(201, 168, 106, 0.1);
+  border: 1rpx solid rgba(201, 168, 106, 0.25);
+}
+.lottery-config-row {
+  display: flex;
+  align-items: center;
+  padding: 8rpx 0;
+}
+.lottery-config-divider {
+  height: 0;
+  border-top: 1rpx dashed #F0E5CC;
+  margin: 4rpx 0;
+}
+.lottery-config-label { flex: 1; min-width: 0; }
+.lottery-config-main {
+  font-size: 28rpx;
+  color: #181818;
+  font-weight: 500;
+}
+.lottery-config-sub {
+  font-size: 20rpx;
+  color: #999;
+  margin-top: 4rpx;
+}
+
+/* 步进器 */
+.lottery-stepper {
+  display: flex;
+  align-items: center;
+  background: #FAF6EE;
+  border-radius: 12rpx;
+  overflow: hidden;
+  margin-left: 16rpx;
+}
+.lottery-stepper-btn {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #C9A86A;
+  font-size: 36rpx;
+  font-weight: 600;
+  user-select: none;
+}
+.lottery-stepper-btn:active { background: rgba(201, 168, 106, 0.15); }
+.lottery-stepper-value {
+  width: 64rpx;
+  text-align: center;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #181818;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+}
+.lottery-clear-btn {
+  font-size: 22rpx;
+  color: #C9A86A;
+  padding: 8rpx 12rpx;
+  margin-left: 8rpx;
+}
+.lottery-clear-btn:active { opacity: 0.6; }
+
+/* 紧凑条件条（结果态/默认态共用） */
+.lottery-config-mini {
+  margin: 24rpx 24rpx 0;
+  padding: 20rpx 22rpx;
+  background: #FFFFFF;
+  border-radius: 16rpx;
+  border: 1rpx solid rgba(201, 168, 106, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+.lottery-config-mini-text {
+  flex: 1;
+  min-width: 0;
+  font-size: 24rpx;
+  color: #555;
+  line-height: 36rpx;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 中央抽签按钮 */
+.lottery-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80rpx 0 60rpx;
+}
+.lottery-hint {
+  font-size: 24rpx;
+  color: #C9A86A;
+  letter-spacing: 8rpx;
+  margin-bottom: 32rpx;
+}
+.lottery-btn {
+  width: 312rpx;
+  height: 312rpx;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 35% 30%, #FFE4B0 0%, #E8C97A 35%, #C9A86A 65%, #A07F45 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 24rpx 64rpx rgba(201, 168, 106, 0.45),
+    inset 0 -8rpx 32rpx rgba(120, 80, 30, 0.3),
+    inset 0 8rpx 16rpx rgba(255, 255, 255, 0.4);
+  position: relative;
+  transition: transform 0.2s;
+}
+.lottery-btn::before {
+  content: "";
+  position: absolute;
+  top: -16rpx; left: -16rpx; right: -16rpx; bottom: -16rpx;
+  border-radius: 50%;
+  border: 4rpx dashed rgba(201, 168, 106, 0.45);
+  animation: lottery-spin 30s linear infinite;
+}
+@keyframes lottery-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.lottery-btn-text {
+  font-size: 160rpx;
+  font-weight: 800;
+  font-family: "Songti SC", "STSong", "SimSun", serif;
+  color: #FFFFFF;
+  text-shadow: 0 4rpx 8rpx rgba(0,0,0,0.18);
+  line-height: 1;
+}
+.lottery-btn-hover { transform: scale(0.95); }
+.lottery-btn.disabled {
+  background: #E5E5E5;
+  box-shadow: none;
+}
+.lottery-btn.disabled .lottery-btn-text {
+  color: #BBB;
+  text-shadow: none;
+}
+.lottery-btn.disabled::before { border-color: #DDD; animation: none; }
+.lottery-btn.animating { animation: lottery-shake 0.6s ease-in-out; }
+@keyframes lottery-shake {
+  0% { transform: rotate(0); }
+  20% { transform: rotate(-15deg) scale(0.95); }
+  40% { transform: rotate(20deg) scale(1.05); }
+  60% { transform: rotate(-12deg) scale(0.97); }
+  80% { transform: rotate(8deg) scale(1.02); }
+  100% { transform: rotate(0); }
+}
+
+.lottery-pool-hint {
+  font-size: 22rpx;
+  color: #BBB;
+  margin-top: 28rpx;
+}
+.lottery-pool-empty { color: #C9A86A; }
+
+/* 抽取结果区 */
+.lottery-result {
+  margin: 24rpx 24rpx 0;
+  background: #FFFFFF;
+  border-radius: 24rpx;
+  padding: 28rpx 24rpx 32rpx;
+  box-shadow: 0 4rpx 16rpx rgba(201, 168, 106, 0.08);
+  border: 1rpx solid rgba(201, 168, 106, 0.25);
+}
+.lottery-result-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24rpx;
+  padding: 0 4rpx;
+}
+.lottery-result-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #181818;
+  display: flex;
+  align-items: center;
+}
+.lottery-result-mark {
+  color: #C9A86A;
+  font-family: "Songti SC", serif;
+  margin-right: 8rpx;
+  font-size: 32rpx;
+}
+.lottery-result-meta {
+  font-size: 22rpx;
+  color: #999;
+}
+.lottery-result-warn {
+  background: #FFF5E0;
+  border-left: 4rpx solid #C9A86A;
+  padding: 12rpx 16rpx;
+  font-size: 22rpx;
+  color: #8B6914;
+  margin-bottom: 16rpx;
+  border-radius: 8rpx;
+}
+
+/* 关键：固定 3 列 + 1:1 正方形色卡（统一尺寸） */
+.lottery-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20rpx;
+}
+.lottery-card {
+  background: #FAFBFD;
+  border-radius: 16rpx;
+  padding: 12rpx;
+  border: 1rpx solid rgba(0,0,0,0.04);
+  display: flex;
+  flex-direction: column;
+}
+.lottery-card-hover { transform: scale(0.97); transition: transform 0.15s; }
+.lottery-swatch {
+  width: 100%;
+  /* aspect-ratio: 1 / 1; -- 微信小程序兼容性问题，用 padding-bottom 替代 */
+  padding-bottom: 100%;
+  height: 0;
+  border-radius: 12rpx;
+  border: 1rpx solid rgba(0,0,0,0.06);
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 8rpx;
+}
+.lottery-swatch::after {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0; height: 50%;
+  background: linear-gradient(180deg, rgba(255,255,255,0.18), transparent);
+  pointer-events: none;
+}
+.lottery-brand-badge {
+  position: absolute;
+  bottom: 8rpx;
+  left: 8rpx;
+  background: rgba(255,255,255,0.94);
+  color: #181818;
+  font-size: 18rpx;
+  font-weight: 600;
+  padding: 2rpx 10rpx;
+  border-radius: 6rpx;
+  letter-spacing: 0.4rpx;
+  z-index: 2;
+}
+.lottery-name {
+  font-size: 22rpx;
+  color: #181818;
+  font-weight: 500;
+  line-height: 1.3;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 4rpx;
+}
+
+/* 底部双按钮 */
+.lottery-redraw-bar {
+  display: flex;
+  gap: 16rpx;
+  margin: 28rpx 24rpx 0;
+}
+.lottery-redraw-btn {
+  flex: 1;
+  height: 88rpx;
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  font-size: 26rpx;
+  font-weight: 500;
+}
+.lottery-redraw-btn.primary {
+  background: linear-gradient(135deg, #E8C97A, #C9A86A);
+  color: #FFFFFF;
+  box-shadow: 0 8rpx 24rpx rgba(201, 168, 106, 0.3);
+}
+.lottery-redraw-btn.primary.animating { animation: lottery-pulse 0.6s ease-in-out; }
+@keyframes lottery-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(0.96); }
+}
+.lottery-redraw-btn.secondary {
+  background: #FFFFFF;
+  border: 1rpx solid #DCDCDC;
+  color: #555;
+}
+.lottery-redraw-icon { font-size: 28rpx; }
+
+/* 抽签历史弹层条目 */
+.lottery-hist-item {
+  padding: 24rpx 8rpx;
+  border-bottom: 1rpx solid #F0F0F0;
+}
+.lottery-hist-time {
+  font-size: 22rpx;
+  color: #C9A86A;
+  font-weight: 600;
+  margin-bottom: 6rpx;
+}
+.lottery-hist-names {
+  font-size: 24rpx;
+  color: #555;
+  line-height: 1.4;
+}
+
+/* 紧凑条件条 - 调整按钮覆盖（hover/按钮样式） */
+.lottery-config-mini-hover { background: #FAF6EE !important; }
+
+/* 调整按钮：纯文字金色，无背景框（对照视觉稿截图） */
+.lottery-config-adjust-btn {
+  display: flex;
+  align-items: center;
+  gap: 4rpx;
+  font-size: 24rpx;
+  line-height: 36rpx;
+  color: #C9A86A;
+  font-weight: 500;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.lottery-config-adjust-icon {
+  font-size: 22rpx;
+  line-height: 36rpx;
+}
+
+/* 展开面板头部 */
+.lottery-config-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12rpx;
+  margin-bottom: 8rpx;
+  border-bottom: 1rpx dashed #F0E5CC;
+}
+.lottery-config-header-title {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #181818;
+}
+.lottery-config-collapse-btn {
+  font-size: 22rpx;
+  color: #C9A86A;
+  padding: 4rpx 8rpx;
+}
+.lottery-config-collapse-btn:active { opacity: 0.6; }
