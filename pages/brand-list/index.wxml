@@ -501,12 +501,12 @@
         placeholder="请输入方案名称"
         value="{{schemeRenameInput}}"
         bindinput="onSchemeRenameInput"
-        maxlength="12"
+        maxlength="5"
         focus="{{schemeRenameVisible}}"
         confirm-type="done"
       />
       <view class="rename-tip">
-        <text>{{schemeRenameInput.length}} / 12</text>
+        <text>{{schemeRenameInput.length}} / 5</text>
         <text wx:if="{{schemeRenameChecking}}" class="rename-checking">⏱ 安全检测中...</text>
       </view>
       <view class="rename-actions">

@@ -973,7 +973,7 @@ Page({
   },
   onSchemeRenameInput(e) {
     let v = e.detail.value || '';
-    if (v.length > 12) v = v.slice(0, 12);
+    if (v.length > 5) v = v.slice(0, 5);
     this.setData({ schemeRenameInput: v });
   },
   onSchemeRenameSave() {
@@ -982,8 +982,8 @@ Page({
       this.showToast('名称不能为空');
       return;
     }
-    if (name.length > 12) {
-      this.showToast('名称最长 12 个字符');
+    if (name.length > 5) {
+      this.showToast('名称最长 5 个字符');
       return;
     }
     if (this.data.schemeRenameChecking) return;
