@@ -994,7 +994,12 @@
   color: #C9A86A;
   font-weight: 700;
   font-family: "SF Mono", Menlo, Consolas, monospace;
-  margin: 0 4rpx;
+  margin: 0 2rpx;
+}
+
+/* 紧凑条内的 lottery-num 不要外边距（避免挤断行） */
+.lottery-config-mini .lottery-num {
+  margin: 0 1rpx;
 }
 
 /* 详细配置卡（初始态） */
@@ -1068,15 +1073,19 @@
 /* 紧凑条件条（结果态/默认态共用） */
 .lottery-config-mini {
   margin: 24rpx 24rpx 0;
-  padding: 18rpx 24rpx;
+  padding: 18rpx 20rpx;
   background: #FFF8E7;
   border-radius: 16rpx;
   border: 1rpx solid rgba(201, 168, 106, 0.25);
 }
 .lottery-config-mini-text {
-  font-size: 24rpx;
+  font-size: 22rpx;
   color: #8B6914;
   line-height: 1.4;
+  /* 强制单行 + 超出截断（兜底，正常应能容纳） */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* 中央抽签按钮 */

@@ -88,6 +88,7 @@ Page({
     // ===== 今日签 =====
     lotteryConfig: { dedupDays: 3, count: 3 },  // X 日不重复，Y 抽取数量
     lotteryConfigExpanded: false,  // 默认折叠紧凑条；点击「调整」展开
+    lotteryConfigMiniText: '3 日内不重复 · 抽取 3 个 · 已拥有 0 个',  // 紧凑条预拼接文字
     lotteryDrawn: [],          // 当前抽中的颜料列表（含 _brandColor/_brandAbbr/_brandCn）
     lotteryHasResult: false,   // 是否已经抽过（决定显示初始态还是结果态）
     lotteryHistory: [],        // 抽签历史（最近 30 次）
@@ -106,6 +107,7 @@ Page({
         this.setData({ lotteryConfig: { dedupDays: cfg.dedupDays, count: cfg.count || 3 } });
       }
     } catch (e) {}
+    this._updateLotteryMiniText();
     this.refresh();
   },
 
@@ -646,7 +648,7 @@ Page({
   _refreshLotteryPool() {
     const all = this._allPigments || [];
     const owned = all.filter(p => p.owned);
-    this.setData({ ownedPoolCount: owned.length });
+    this.setData({ ownedPoolCount: owned.length }, () => this._updateLotteryMiniText());
     // 加载历史
     let history = [];
     try {
@@ -660,18 +662,27 @@ Page({
     this.setData({ lotteryConfigExpanded: !this.data.lotteryConfigExpanded });
   },
 
+  // 拼接紧凑条文字（避免 wxml 嵌套 text 导致换行）
+  _updateLotteryMiniText() {
+    const { dedupDays, count } = this.data.lotteryConfig;
+    const ownedCount = this.data.ownedPoolCount || 0;
+    const dedupPart = dedupDays ? `${dedupDays} 日内不重复` : '不限重复';
+    const text = `${dedupPart} · 抽取 ${count} 个 · 已拥有 ${ownedCount} 个`;
+    this.setData({ lotteryConfigMiniText: text });
+  },
+
   // 配置：步进器
   onLotteryDedupChange(e) {
     const { delta } = e.currentTarget.dataset;
     const cur = this.data.lotteryConfig.dedupDays;
     const next = Math.max(1, Math.min(7, (cur || 0) + Number(delta)));
     const cfg = { ...this.data.lotteryConfig, dedupDays: next };
-    this.setData({ lotteryConfig: cfg });
+    this.setData({ lotteryConfig: cfg }, () => this._updateLotteryMiniText());
     this._saveLotteryConfig();
   },
   onLotteryDedupClear() {
     const cfg = { ...this.data.lotteryConfig, dedupDays: null };
-    this.setData({ lotteryConfig: cfg });
+    this.setData({ lotteryConfig: cfg }, () => this._updateLotteryMiniText());
     this._saveLotteryConfig();
   },
   onLotteryCountChange(e) {
@@ -679,7 +690,7 @@ Page({
     const cur = this.data.lotteryConfig.count || 3;
     const next = Math.max(1, Math.min(9, cur + Number(delta)));
     const cfg = { ...this.data.lotteryConfig, count: next };
-    this.setData({ lotteryConfig: cfg });
+    this.setData({ lotteryConfig: cfg }, () => this._updateLotteryMiniText());
     this._saveLotteryConfig();
   },
   _saveLotteryConfig() {

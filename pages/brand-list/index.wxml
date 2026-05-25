@@ -203,11 +203,7 @@
 
         <!-- 紧凑条件条（默认显示，含「⚙ 调整」入口） -->
         <view wx:if="{{!lotteryConfigExpanded}}" class="lottery-config-mini" bindtap="onLotteryConfigToggle" hover-class="lottery-config-mini-hover">
-          <text class="lottery-config-mini-text">
-            <text wx:if="{{lotteryConfig.dedupDays}}"><text class="lottery-num">{{lotteryConfig.dedupDays}}</text> 日内不重复 · </text>
-            <text wx:else>不限重复 · </text>
-            抽取 <text class="lottery-num">{{lotteryConfig.count}}</text> 个 · 已拥有 <text class="lottery-num">{{ownedPoolCount}}</text> 个
-          </text>
+          <view class="lottery-config-mini-text">{{lotteryConfigMiniText}}</view>
           <view class="lottery-config-adjust-btn">
             <text class="lottery-config-adjust-icon">⚙</text>
             <text>调整</text>
