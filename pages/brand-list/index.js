@@ -88,7 +88,7 @@ Page({
     // ===== 今日签 =====
     lotteryConfig: { dedupDays: 3, count: 3 },  // X 日不重复，Y 抽取数量
     lotteryConfigExpanded: false,  // 默认折叠紧凑条；点击「调整」展开
-    lotteryConfigMiniText: '3 日内不重复 · 抽取 3 个 · 已拥有 0 个',  // 紧凑条预拼接文字
+    lotteryConfigMiniText: '3 日内不重复 · 抽取 3 个 · 总 0 个',  // 紧凑条预拼接文字
     lotteryDrawn: [],          // 当前抽中的颜料列表（含 _brandColor/_brandAbbr/_brandCn）
     lotteryHasResult: false,   // 是否已经抽过（决定显示初始态还是结果态）
     lotteryHistory: [],        // 抽签历史（最近 30 次）
@@ -667,7 +667,7 @@ Page({
     const { dedupDays, count } = this.data.lotteryConfig;
     const ownedCount = this.data.ownedPoolCount || 0;
     const dedupPart = dedupDays ? `${dedupDays} 日内不重复` : '不限重复';
-    const text = `${dedupPart} · 抽取 ${count} 个 · 已拥有 ${ownedCount} 个`;
+    const text = `${dedupPart} · 抽取 ${count} 个 · 总 ${ownedCount} 个`;
     this.setData({ lotteryConfigMiniText: text });
   },
 
