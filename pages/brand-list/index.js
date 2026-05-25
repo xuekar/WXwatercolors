@@ -117,7 +117,9 @@ Page({
       if (this.data.activeTab === 'library') {
         this._reloadLibraryDataIfNeeded();
       } else if (this.data.activeTab === 'lottery') {
-        this._refreshLotteryPool();
+        // 重新进入今日签也走 _enterLottery 重建逻辑，
+        // 确保从详情页改完已拥有后回来能看到最新池子
+        this._enterLottery();
       }
     } else {
       this._loaded = true;
@@ -625,24 +627,26 @@ Page({
   _LOTTERY_LAST_DRAWN_KEY: 'wc_lottery_last_drawn_v1',  // { pigmentGid: timestamp }
 
   _enterLottery() {
-    if (!this._allPigments) {
-      this.setData({ libLoading: true });
-      pigmentStore.getAllPigmentsAsync().then(all => {
-        const brandsMeta = dataStore.getBrandsMeta();
-        const brandMap = {};
-        brandsMeta.forEach(b => { brandMap[b.id] = b; });
-        all.forEach(p => {
-          const b = brandMap[p.brandId];
-          p._brandColor = b ? b.color : '#888';
-          p._brandAbbr = b ? b.iconText : '';
-          p._brandCn = b ? b.nameCn : '';
-        });
-        this._allPigments = all;
-        this.setData({ libLoading: false, brandsMeta }, () => this._refreshLotteryPool());
+    // 即使已有缓存，也重新从 pigment-store 读取最新数据，
+    // 避免「从详情页改了已拥有 → 切到今日签」时颜料池不更新。
+    const isFirstLoad = !this._allPigments;
+    if (isFirstLoad) this.setData({ libLoading: true });
+    pigmentStore.getAllPigmentsAsync().then(all => {
+      const brandsMeta = dataStore.getBrandsMeta();
+      const brandMap = {};
+      brandsMeta.forEach(b => { brandMap[b.id] = b; });
+      all.forEach(p => {
+        const b = brandMap[p.brandId];
+        p._brandColor = b ? b.color : '#888';
+        p._brandAbbr = b ? b.iconText : '';
+        p._brandCn = b ? b.nameCn : '';
       });
-    } else {
-      this._refreshLotteryPool();
-    }
+      this._allPigments = all;
+      this.setData({ libLoading: false, brandsMeta }, () => this._refreshLotteryPool());
+    }).catch(err => {
+      console.error('今日签加载失败', err);
+      this.setData({ libLoading: false });
+    });
   },
 
   _refreshLotteryPool() {
