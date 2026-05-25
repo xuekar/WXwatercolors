@@ -87,6 +87,7 @@ Page({
 
     // ===== 今日签 =====
     lotteryConfig: { dedupDays: 3, count: 3 },  // X 日不重复，Y 抽取数量
+    lotteryConfigExpanded: false,  // 默认折叠紧凑条；点击「调整」展开
     lotteryDrawn: [],          // 当前抽中的颜料列表（含 _brandColor/_brandAbbr/_brandCn）
     lotteryHasResult: false,   // 是否已经抽过（决定显示初始态还是结果态）
     lotteryHistory: [],        // 抽签历史（最近 30 次）
@@ -652,6 +653,11 @@ Page({
       history = wx.getStorageSync(this._LOTTERY_HISTORY_KEY) || [];
     } catch (e) {}
     this.setData({ lotteryHistory: Array.isArray(history) ? history : [] });
+  },
+
+  // 配置：展开/折叠
+  onLotteryConfigToggle() {
+    this.setData({ lotteryConfigExpanded: !this.data.lotteryConfigExpanded });
   },
 
   // 配置：步进器
