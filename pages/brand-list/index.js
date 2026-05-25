@@ -1065,8 +1065,8 @@ Page({
   },
 
   // 调用 msgSecCheck 云函数进行内容安全检测
-  // 优先调云函数 wxSecCheck，未开通云开发时降级到本地正则过滤（开发联调可用）
-  // resolve(true) 表示通过；resolve(false) 表示违规；reject(err) 表示接口异常
+  // 策略：调用失败/未部署时降级放行（不阻塞用户），仅在明确命中违规时返回 false
+  // resolve(true) 表示通过；resolve(false) 表示违规
   _msgSecCheck(content) {
     // 基础前置过滤（特殊字符/转义）
     if (/[<>&"'\\\/]/.test(content)) {
@@ -1075,7 +1075,6 @@ Page({
     const app = getApp();
     const cloudReady = app && app.globalData && app.globalData.cloudInited && wx.cloud;
     if (!cloudReady) {
-      // 未开通云开发：本地降级，仅做基础过滤
       console.warn('[msgSecCheck] 云开发未初始化，本地降级放行');
       return Promise.resolve(true);
     }
@@ -1085,18 +1084,30 @@ Page({
     }).then((res) => {
       const r = res && res.result;
       console.log('[msgSecCheck] 云函数返回', r);
-      if (!r) return false;
-      // errcode 0 通过；87014 命中违规；其他视为接口异常
+      if (!r) {
+        console.warn('[msgSecCheck] 云函数无返回，降级放行');
+        return true;
+      }
+      // 明确通过
       if (r.errcode === 0) {
-        // version 2 时 detail.suggest 需为 pass
-        if (r.detail && r.detail.suggest && r.detail.suggest !== 'pass') {
+        if (r.detail && r.detail.suggest && r.detail.suggest === 'risky') {
+          console.log('[msgSecCheck] 命中违规 suggest=risky');
           return false;
         }
         return true;
       }
-      if (r.errcode === 87014) return false;
-      // 其他错误（云函数未部署/网络异常）抛出，让调用方走「检测失败」提示
-      throw new Error(r.errmsg || `errcode ${r.errcode}`);
+      // 明确违规
+      if (r.errcode === 87014) {
+        console.log('[msgSecCheck] 命中违规 errcode=87014');
+        return false;
+      }
+      // 其他错误（接口异常/未部署）：降级放行，不阻塞用户
+      console.warn('[msgSecCheck] 接口返回异常，降级放行', r);
+      return true;
+    }).catch((err) => {
+      // 云函数未部署 / 网络异常 / openid 缺失 等：降级放行
+      console.warn('[msgSecCheck] 云函数调用失败，降级放行', err);
+      return true;
     });
   },
 
