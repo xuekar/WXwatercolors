@@ -420,8 +420,6 @@
           <view wx:if="{{activeScheme.isSaved && activeScheme.pigmentsList.length === 0}}" class="scheme-saved-empty">
             该方案暂无颜料，点击「修改方案」添加
           </view>
-          <!-- 占位避免 footer-bar 遮挡 -->
-          <view style="height: 120rpx;"></view>
         </scroll-view>
 
         <!-- 底部操作栏：编辑态 vs 已保存态 -->

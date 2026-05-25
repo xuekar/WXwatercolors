@@ -5,6 +5,9 @@ page {
   font-size: 28rpx;
   color: #181818;
   -webkit-tap-highlight-color: transparent;
+  /* 让 .page 容器内 height: 100% 能正确计算，避免 100vh 在某些机型上溢出导致的空白滚动 */
+  height: 100%;
+  overflow: hidden;
 }
 
 view, text { box-sizing: border-box; }
