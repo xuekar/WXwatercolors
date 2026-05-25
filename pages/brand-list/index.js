@@ -658,6 +658,7 @@ Page({
   _LOTTERY_HISTORY_KEY: 'wc_lottery_history_v1',
   _LOTTERY_CONFIG_KEY: 'wc_lottery_config_v1',
   _LOTTERY_LAST_DRAWN_KEY: 'wc_lottery_last_drawn_v1',  // { pigmentGid: timestamp }
+  _LOTTERY_CURRENT_KEY: 'wc_lottery_current_v1',  // 当前抽取结果（含 drawnAt + saved 状态）跨日清空
 
   _enterLottery() {
     // 即使已有缓存，也重新从 pigment-store 读取最新数据，
@@ -694,6 +695,67 @@ Page({
     this.setData({ lotteryHistory: Array.isArray(history) ? history : [] });
     // 同步已保存方案数（用于结果页进度条）
     this._refreshLotterySchemeProgress();
+    // 跨日恢复：仅当 drawnAt 是今天才显示结果
+    this._restoreLotteryCurrentIfToday();
+  },
+
+  // 判断时间戳是否为本地"今天"
+  _isSameLocalDay(ts) {
+    if (!ts) return false;
+    const a = new Date(ts);
+    const b = new Date();
+    return a.getFullYear() === b.getFullYear()
+      && a.getMonth() === b.getMonth()
+      && a.getDate() === b.getDate();
+  },
+
+  // 从 storage 读取当前抽取结果，跨日则清除
+  _restoreLotteryCurrentIfToday() {
+    let cur = null;
+    try {
+      cur = wx.getStorageSync(this._LOTTERY_CURRENT_KEY) || null;
+    } catch (e) {}
+    if (!cur || !cur.drawnAt || !this._isSameLocalDay(cur.drawnAt)) {
+      // 跨日 / 无数据：清空当前显示，保留历史
+      try { wx.removeStorageSync(this._LOTTERY_CURRENT_KEY); } catch (e) {}
+      this.setData({
+        lotteryDrawn: [],
+        lotteryHasResult: false,
+        lotteryDrawnAt: 0,
+        lotterySaveDisabled: false,
+        lotteryEmpty: '',
+      });
+      return;
+    }
+    // 今天的结果 → 用最新 _allPigments 重新拿色卡（防止详情页改了 swatch）
+    const all = this._allPigments || [];
+    const map = {};
+    all.forEach(p => { map[p._gid] = p; });
+    const drawn = (cur.gids || []).map(gid => map[gid]).filter(Boolean).map(p => ({ ...p }));
+    if (drawn.length === 0) {
+      try { wx.removeStorageSync(this._LOTTERY_CURRENT_KEY); } catch (e) {}
+      this.setData({ lotteryDrawn: [], lotteryHasResult: false, lotteryDrawnAt: 0, lotterySaveDisabled: false });
+      return;
+    }
+    this.setData({
+      lotteryDrawn: drawn,
+      lotteryHasResult: true,
+      lotteryDrawnAt: cur.drawnAt,
+      lotterySaveDisabled: !!cur.saved,
+      lotteryEmpty: cur.empty || '',
+    });
+  },
+
+  // 持久化当前抽取结果（用于跨编译/跨进入恢复，跨日自动失效）
+  _saveLotteryCurrent(patch) {
+    let cur = null;
+    try {
+      cur = wx.getStorageSync(this._LOTTERY_CURRENT_KEY) || null;
+    } catch (e) {}
+    const next = Object.assign({}, cur || {}, patch);
+    try {
+      wx.setStorageSync(this._LOTTERY_CURRENT_KEY, next);
+    } catch (e) {}
   },
 
   // 刷新今日签结果页的「已保存 X / 10」进度条
@@ -837,6 +899,13 @@ Page({
         lotteryEmpty,
         lotterySaveDisabled: false,  // 新一次抽取，重新允许保存
       });
+      // 持久化当前结果，跨日自动失效（仅保留 gid + 时间 + 提示）
+      this._saveLotteryCurrent({
+        drawnAt: now,
+        gids: drawn.map(p => p._gid),
+        empty: lotteryEmpty,
+        saved: false,
+      });
     }, 600);  // 0.6s 动画
   },
 
@@ -930,6 +999,7 @@ Page({
     }, () => {
       this._saveSchemes();
       this._refreshLotterySchemeProgress();
+      this._saveLotteryCurrent({ saved: true });  // 同步落盘 saved 状态（跨编译保留置灰态）
       this.showToast('已保存到色彩方');
     });
   },
