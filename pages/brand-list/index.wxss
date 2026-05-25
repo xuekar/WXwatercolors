@@ -1073,16 +1073,21 @@
 /* 紧凑条件条（结果态/默认态共用） */
 .lottery-config-mini {
   margin: 24rpx 24rpx 0;
-  padding: 18rpx 20rpx;
+  padding: 20rpx 22rpx;
   background: #FFFFFF;
   border-radius: 16rpx;
   border: 1rpx solid rgba(201, 168, 106, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
 }
 .lottery-config-mini-text {
-  font-size: 22rpx;
+  flex: 1;
+  min-width: 0;
+  font-size: 24rpx;
   color: #555;
-  line-height: 1.4;
-  /* 强制单行 + 超出截断（兜底，正常应能容纳） */
+  line-height: 36rpx;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1317,15 +1322,8 @@
   line-height: 1.4;
 }
 
-/* 紧凑条件条 - 布局覆盖（横向排列 + 调整按钮在右） */
-.lottery-config-mini {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16rpx;
-}
+/* 紧凑条件条 - 调整按钮覆盖（hover/按钮样式） */
 .lottery-config-mini-hover { background: #FAF6EE !important; }
-.lottery-config-mini-text { flex: 1; min-width: 0; }
 
 /* 调整按钮：纯文字金色，无背景框（对照视觉稿截图） */
 .lottery-config-adjust-btn {
@@ -1333,15 +1331,15 @@
   align-items: center;
   gap: 4rpx;
   font-size: 24rpx;
+  line-height: 36rpx;
   color: #C9A86A;
   font-weight: 500;
   flex-shrink: 0;
-  padding: 4rpx 0;
   white-space: nowrap;
 }
 .lottery-config-adjust-icon {
   font-size: 22rpx;
-  line-height: 1;
+  line-height: 36rpx;
 }
 
 /* 展开面板头部 */
