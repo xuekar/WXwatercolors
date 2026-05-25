@@ -1,7 +1,7 @@
-<!-- 水彩品牌列表页 -->
+<!-- 水彩品牌列表页（含色彩库 Tab） -->
 <view class="page">
 
-  <!-- 头部 Tabs -->
+  <!-- 顶部主 Tabs：全部品牌 / 色彩库 / 未拥有 -->
   <view class="tabs">
     <view
       class="tab {{activeTab === 'all' ? 'active' : ''}}"
@@ -12,11 +12,11 @@
       <view class="tab-bar"></view>
     </view>
     <view
-      class="tab {{activeTab === 'owned' ? 'active' : ''}}"
-      data-tab="owned"
+      class="tab {{activeTab === 'library' ? 'active' : ''}}"
+      data-tab="library"
       bindtap="onTabChange"
     >
-      <view class="tab-label">已拥有</view>
+      <view class="tab-label">色彩库</view>
       <view class="tab-bar"></view>
     </view>
     <view
@@ -29,59 +29,176 @@
     </view>
   </view>
 
-  <!-- 筛选栏 -->
-  <view class="filter-bar">
-    <view class="filter-item" bindtap="onSortTap">
-      <text class="filter-label">排序</text>
-      <text class="filter-value">{{sortLabel}}</text>
-      <text class="filter-arrow">▼</text>
+  <!-- ============ 模式 1：品牌视图（全部品牌 / 未拥有 Tab） ============ -->
+  <block wx:if="{{activeTab !== 'library'}}">
+    <view class="filter-bar">
+      <view class="filter-item" bindtap="onSortTap">
+        <text class="filter-label">排序</text>
+        <text class="filter-value">{{sortLabel}}</text>
+        <text class="filter-arrow">▼</text>
+      </view>
+      <view class="filter-count">共 {{filteredList.length}} 个品牌</view>
     </view>
-    <view class="filter-count">共 {{filteredList.length}} 个品牌</view>
-  </view>
 
-  <!-- 列表 -->
-  <scroll-view scroll-y class="list-scroll" enhanced show-scrollbar="{{false}}">
-    <view class="list" wx:if="{{filteredList.length > 0}}">
+    <scroll-view scroll-y class="list-scroll" enhanced show-scrollbar="{{false}}">
+      <view class="list" wx:if="{{filteredList.length > 0}}">
+        <view
+          class="brand-card"
+          wx:for="{{filteredList}}"
+          wx:key="id"
+          data-id="{{item.id}}"
+          bindtap="onBrandTap"
+          hover-class="card-hover"
+          hover-stay-time="100"
+        >
+          <view class="brand-icon" style="background: {{item.color}}">
+            <text class="brand-icon-text">{{item.iconText}}</text>
+          </view>
+          <view class="brand-info">
+            <view class="brand-name-cn">{{item.nameCn}}</view>
+            <view class="brand-name-en">{{item.nameEn}}</view>
+          </view>
+          <view class="brand-fraction {{item.ownedCount === 0 ? 'is-empty' : ''}} {{item.ownedCount > 0 && item.ownedCount === item.totalCount ? 'is-full' : ''}}">
+            <text class="fraction-num">{{item.ownedCount}}</text>
+            <view class="fraction-line"></view>
+            <text class="fraction-den">{{item.totalCount}}</text>
+          </view>
+        </view>
+        <view class="list-bottom-tip">— 已展示全部品牌 —</view>
+      </view>
+      <view class="empty-wrap" wx:else>
+        <view class="empty-icon">📂</view>
+        <view class="empty-text">暂无品牌数据</view>
+      </view>
+    </scroll-view>
+  </block>
+
+  <!-- ============ 模式 2：色彩库 Tab ============ -->
+  <block wx:if="{{activeTab === 'library'}}">
+    <!-- 子 Tab -->
+    <view class="sub-tabs">
+      <view class="sub-tab {{librarySubTab === 'owned' ? 'active' : ''}}" data-sub="owned" bindtap="onLibrarySubTab">
+        <text class="sub-tab-text">已拥有 · {{stat.ownedCount}}</text>
+      </view>
+      <view class="sub-tab wishlist {{librarySubTab === 'wishlist' ? 'active' : ''}}" data-sub="wishlist" bindtap="onLibrarySubTab">
+        <text class="sub-tab-text">★ 心愿单 · {{stat.wishlistCount}}</text>
+      </view>
+      <view class="sub-tab {{librarySubTab === 'unowned' ? 'active' : ''}}" data-sub="unowned" bindtap="onLibrarySubTab">
+        <text class="sub-tab-text">未拥有 · {{stat.unownedCount}}</text>
+      </view>
+    </view>
+
+    <!-- 操作栏：筛选 + 排序（两段） -->
+    <view class="action-bar">
+      <view class="action-btn {{activeFilterCount > 0 ? 'active' : ''}}" bindtap="onLibFilterTap" hover-class="action-hover">
+        <text class="action-icon">⌒</text>
+        <text class="action-text">筛选</text>
+        <text wx:if="{{activeFilterCount > 0}}" class="action-badge">{{activeFilterCount}}</text>
+      </view>
+      <view class="action-divider"></view>
+      <view class="action-btn" bindtap="onLibSortTap" hover-class="action-hover">
+        <text class="action-icon">⇅</text>
+        <text class="action-text">排序</text>
+        <text class="action-sub">{{libSortLabel}}</text>
+      </view>
+    </view>
+
+    <!-- 已应用筛选 chip 区 -->
+    <view class="filter-chip-bar" wx:if="{{libActiveFilters.length > 0}}">
+      <text class="filter-chip-label">已应用</text>
       <view
-        class="brand-card"
-        wx:for="{{filteredList}}"
-        wx:key="id"
-        data-id="{{item.id}}"
-        bindtap="onBrandTap"
-        hover-class="card-hover"
-        hover-stay-time="100"
+        class="filter-chip"
+        wx:for="{{libActiveFilters}}"
+        wx:key="key"
+        data-key="{{item.key}}"
+        bindtap="onLibRemoveChip"
+        hover-class="filter-chip-hover"
       >
-        <view class="brand-icon" style="background: {{item.color}}">
-          <text class="brand-icon-text">{{item.iconText}}</text>
-        </view>
+        <text class="filter-chip-text">{{item.label}}</text>
+        <text class="filter-chip-x">×</text>
+      </view>
+      <text class="filter-chip-count">命中 {{libFilteredTotal}}</text>
+    </view>
 
-        <view class="brand-info">
-          <view class="brand-name-cn">{{item.nameCn}}</view>
-          <view class="brand-name-en">{{item.nameEn}}</view>
-        </view>
+    <!-- 加载状态 -->
+    <view wx:if="{{libLoading}}" class="loading-tip">加载中…</view>
 
-        <view class="brand-fraction {{item.ownedCount === 0 ? 'is-empty' : ''}} {{item.ownedCount > 0 && item.ownedCount === item.totalCount ? 'is-full' : ''}}">
-          <text class="fraction-num">{{item.ownedCount}}</text>
-          <view class="fraction-line"></view>
-          <text class="fraction-den">{{item.totalCount}}</text>
+    <!-- 跨品牌颜料列表 -->
+    <scroll-view
+      scroll-y
+      class="lib-scroll"
+      bindscrolltolower="onLibScrollLower"
+      lower-threshold="200"
+      wx:if="{{!libLoading}}"
+    >
+      <view
+        class="lib-row"
+        wx:for="{{libRendered}}"
+        wx:key="_gid"
+        data-gid="{{item._gid}}"
+        bindtap="onLibRowTap"
+        hover-class="row-hover"
+        hover-stay-time="80"
+      >
+        <view class="lib-brand-icon" style="background: {{item._brandColor}}">
+          <text class="lib-brand-abbr">{{item._brandAbbr}}</text>
+          <text class="lib-brand-cn">{{item._brandCn}}</text>
+        </view>
+        <view class="lib-info">
+          <view class="lib-name-cn">{{item.nameCn}}</view>
+          <view class="lib-name-en">{{item.nameEn}}</view>
+        </view>
+        <view class="lib-meta">
+          <view class="lib-color-no">{{item.colorNo}}</view>
+          <view class="lib-pigment-trans">{{item._metaSub}}</view>
+        </view>
+        <view class="lib-swatch-wrap">
+          <view wx:if="{{item.swatch}}" class="lib-swatch" style="background: {{item.swatch}}"></view>
+          <view wx:else class="lib-swatch lib-swatch-empty">—</view>
         </view>
       </view>
-      <view class="list-bottom-tip">— 已展示全部品牌 —</view>
-    </view>
 
-    <!-- 空状态 -->
-    <view class="empty-wrap" wx:else>
-      <view class="empty-icon">📂</view>
-      <view class="empty-text">暂无品牌数据</view>
-    </view>
-  </scroll-view>
+      <!-- 空态：筛选无命中 -->
+      <view class="empty-filter-wrap" wx:if="{{libRendered.length === 0 && !libLoading && libIsFilterEmpty}}">
+        <view class="empty-filter-icon">
+          <text class="empty-filter-icon-glyph">⌕</text>
+        </view>
+        <view class="empty-filter-title">没有命中的颜料</view>
+        <view class="empty-filter-desc">{{libEmptyDesc}}</view>
+        <view class="empty-filter-chips" wx:if="{{libActiveFilters.length > 0}}">
+          <view
+            class="empty-filter-chip"
+            wx:for="{{libActiveFilters}}"
+            wx:key="key"
+            data-key="{{item.key}}"
+            bindtap="onLibRemoveChip"
+            hover-class="filter-chip-hover"
+          >
+            <text class="empty-filter-chip-prefix">清除</text>
+            <text class="empty-filter-chip-label">{{item.label}}</text>
+            <text class="empty-filter-chip-x">×</text>
+          </view>
+        </view>
+        <view class="empty-filter-btn" bindtap="onLibClearAllFilters" hover-class="empty-filter-btn-hover">
+          清除全部筛选
+        </view>
+      </view>
 
-  <!-- 排序弹层 -->
+      <!-- 空态：子Tab本身无数据（非筛选导致） -->
+      <view class="empty-wrap" wx:elif="{{libRendered.length === 0 && !libLoading}}">
+        <view class="empty-icon">📂</view>
+        <view class="empty-text">{{libEmptyText}}</view>
+      </view>
+
+      <view class="list-bottom-tip" wx:if="{{libRendered.length > 0}}">
+        — 共 {{libFilteredTotal}} 条 —
+      </view>
+    </scroll-view>
+  </block>
+
+  <!-- 排序弹层（品牌视图用） -->
   <view class="mask {{sortVisible ? 'show' : ''}}" bindtap="onSortClose">
-    <view
-      class="sort-panel {{sortVisible ? 'show' : ''}}"
-      catchtap="noop"
-    >
+    <view class="sort-panel {{sortVisible ? 'show' : ''}}" catchtap="noop">
       <view class="sort-header">
         <text class="sort-title">选择排序方式</text>
         <view class="sort-close" bindtap="onSortClose">✕</view>
@@ -95,5 +212,262 @@
         <view class="radio {{sortType === 'colorNo' ? 'checked' : ''}}"></view>
       </view>
     </view>
+  </view>
+
+  <!-- 色彩库筛选主弹层 -->
+  <view class="mask {{libFilterMainVisible ? 'show' : ''}}" bindtap="onLibFilterMainClose">
+    <view class="filter-panel {{libFilterMainVisible ? 'show' : ''}}" catchtap="noop">
+      <view class="filter-handle"></view>
+      <view class="filter-title">筛选条件</view>
+
+      <view class="filter-row clickable" bindtap="onLibOpenBrandFilter" hover-class="filter-row-hover">
+        <view class="filter-row-text">
+          <view class="filter-row-label">按品牌</view>
+          <view class="filter-row-sub">{{libFilterBrand ? libFilterBrandCn : '未选'}}</view>
+        </view>
+        <text class="filter-row-arrow">›</text>
+      </view>
+
+      <view class="filter-row clickable" bindtap="onLibOpenPigmentFilter" hover-class="filter-row-hover">
+        <view class="filter-row-text">
+          <view class="filter-row-label">按色料</view>
+          <view class="filter-row-sub">{{libFilterPigment ? libFilterPigment : '未选'}}</view>
+        </view>
+        <text class="filter-row-arrow">›</text>
+      </view>
+
+      <view class="filter-row clickable" bindtap="onLibOpenTransFilter" hover-class="filter-row-hover">
+        <view class="filter-row-text">
+          <view class="filter-row-label">按透明度</view>
+          <view class="filter-row-sub">{{libFilterTransLabel}}</view>
+        </view>
+        <text class="filter-row-arrow">›</text>
+      </view>
+
+      <view class="filter-actions">
+        <view class="filter-btn secondary" bindtap="onLibFilterReset" hover-class="filter-btn-hover">重置</view>
+        <view class="filter-btn primary" bindtap="onLibFilterApply" hover-class="filter-btn-hover">应用筛选</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 二级筛选 · 按品牌 -->
+  <view class="mask {{libBrandPanelVisible ? 'show' : ''}}" bindtap="onLibBrandPanelClose">
+    <view class="filter-panel {{libBrandPanelVisible ? 'show' : ''}}" catchtap="noop">
+      <view class="filter-handle"></view>
+      <view class="filter-sub-header">
+        <text class="filter-back" bindtap="onLibBrandPanelClose">‹</text>
+        <text class="filter-sub-title">按品牌（单选）</text>
+      </view>
+      <view
+        class="brand-option {{libBrandTemp === item.id ? 'selected' : ''}}"
+        wx:for="{{brandsMeta}}"
+        wx:key="id"
+        data-id="{{item.id}}"
+        bindtap="onLibBrandOptionTap"
+        hover-class="filter-option-hover"
+      >
+        <view class="brand-option-icon" style="background: {{item.color}}">
+          <text class="brand-option-abbr">{{item.iconText}}</text>
+        </view>
+        <text class="brand-option-cn">{{item.nameCn}}</text>
+        <text class="brand-option-count">· {{item.totalCount}} 个</text>
+        <view class="radio {{libBrandTemp === item.id ? 'checked' : ''}}"></view>
+      </view>
+      <view class="filter-actions">
+        <view class="filter-btn secondary" bindtap="onLibBrandClear" hover-class="filter-btn-hover">清除</view>
+        <view class="filter-btn primary" bindtap="onLibBrandConfirm" hover-class="filter-btn-hover">确定</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 二级筛选 · 按色料 -->
+  <view class="mask {{libPigmentPanelVisible ? 'show' : ''}}" bindtap="onLibPigmentPanelClose">
+    <view class="filter-panel filter-panel-tall {{libPigmentPanelVisible ? 'show' : ''}}" catchtap="noop">
+      <view class="filter-handle"></view>
+      <view class="filter-sub-header">
+        <text class="filter-back" bindtap="onLibPigmentPanelClose">‹</text>
+        <text class="filter-sub-title">按色料（单选）</text>
+      </view>
+      <view class="filter-search">
+        <input
+          class="filter-search-input"
+          placeholder="搜索色料代码（如 PR108）"
+          value="{{libPigmentSearchKey}}"
+          bindinput="onLibPigmentSearchInput"
+        />
+      </view>
+      <scroll-view scroll-y class="filter-options-scroll">
+        <view
+          class="filter-option {{libPigmentTemp === item.code ? 'selected' : ''}}"
+          wx:for="{{libPigmentOptionsFiltered}}"
+          wx:key="code"
+          data-code="{{item.code}}"
+          bindtap="onLibPigmentOptionTap"
+          hover-class="filter-option-hover"
+        >
+          <view class="filter-option-text">
+            <text class="filter-option-code">{{item.code}}</text>
+            <text class="filter-option-count">{{item.count}} 个颜料</text>
+          </view>
+          <view class="radio {{libPigmentTemp === item.code ? 'checked' : ''}}"></view>
+        </view>
+        <view class="filter-options-empty" wx:if="{{libPigmentOptionsFiltered.length === 0}}">无匹配色料</view>
+      </scroll-view>
+      <view class="filter-actions">
+        <view class="filter-btn secondary" bindtap="onLibPigmentClear" hover-class="filter-btn-hover">清除</view>
+        <view class="filter-btn primary" bindtap="onLibPigmentConfirm" hover-class="filter-btn-hover">确定</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 二级筛选 · 按透明度 -->
+  <view class="mask {{libTransPanelVisible ? 'show' : ''}}" bindtap="onLibTransPanelClose">
+    <view class="filter-panel {{libTransPanelVisible ? 'show' : ''}}" catchtap="noop">
+      <view class="filter-handle"></view>
+      <view class="filter-sub-header">
+        <text class="filter-back" bindtap="onLibTransPanelClose">‹</text>
+        <text class="filter-sub-title">按透明度（单选）</text>
+      </view>
+      <view
+        class="trans-option {{libTransTemp === item.value ? 'selected' : ''}}"
+        wx:for="{{libTransOptions}}"
+        wx:key="value"
+        data-value="{{item.value}}"
+        bindtap="onLibTransOptionTap"
+        hover-class="filter-option-hover"
+      >
+        <view class="trans-option-left">
+          <view class="trans-option-dot" style="background: {{item.dot}}"></view>
+          <view>
+            <view class="trans-option-cn">{{item.cn}}</view>
+            <view class="trans-option-en">{{item.value}} · {{item.count}} 个</view>
+          </view>
+        </view>
+        <view class="radio {{libTransTemp === item.value ? 'checked' : ''}}"></view>
+      </view>
+      <view class="filter-actions">
+        <view class="filter-btn secondary" bindtap="onLibTransClear" hover-class="filter-btn-hover">清除</view>
+        <view class="filter-btn primary" bindtap="onLibTransConfirm" hover-class="filter-btn-hover">确定</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 色彩库排序弹层 -->
+  <view class="mask {{libSortVisible ? 'show' : ''}}" bindtap="onLibSortClose">
+    <view class="sort-panel {{libSortVisible ? 'show' : ''}}" catchtap="noop">
+      <view class="sort-header">
+        <text class="sort-title">选择排序方式</text>
+        <view class="sort-close" bindtap="onLibSortClose">✕</view>
+      </view>
+      <view class="sort-option" data-sort="colorNo" bindtap="onLibSortChange">
+        <text class="sort-option-label">按色号</text>
+        <view class="radio {{libSortType === 'colorNo' ? 'checked' : ''}}"></view>
+      </view>
+      <view class="sort-option" data-sort="brand" bindtap="onLibSortChange">
+        <text class="sort-option-label">按品牌</text>
+        <view class="radio {{libSortType === 'brand' ? 'checked' : ''}}"></view>
+      </view>
+      <view class="sort-option" data-sort="markedAt" bindtap="onLibSortChange">
+        <text class="sort-option-label">按加入时间（最新在前）</text>
+        <view class="radio {{libSortType === 'markedAt' ? 'checked' : ''}}"></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 颜料详情抽屉 V4（色彩库行点击拉起，与品牌详情页同款） -->
+  <view class="mask {{drawerVisible ? 'show' : ''}}" bindtap="closeDrawer">
+    <view class="drawer {{drawerVisible ? 'show' : ''}}" catchtap="noop">
+      <view class="drawer-handle"></view>
+
+      <!-- 头部：品牌 ICON + 颜料中文名/英文名/色号 chip -->
+      <view class="drawer-header">
+        <view class="drawer-brand-icon" style="background: {{drawerBrand.color}};">
+          <text class="drawer-brand-abbr">{{drawerBrand.iconText}}</text>
+          <text class="drawer-brand-cn">{{drawerBrand.nameCn}}</text>
+        </view>
+        <view class="drawer-meta">
+          <view class="drawer-title-row">
+            <text class="drawer-title">{{drawerPigment.nameCn}}</text>
+            <view wx:if="{{drawerPigment.owned}}" class="drawer-badge owned">
+              <text class="drawer-badge-icon">✓</text>
+            </view>
+          </view>
+          <view class="drawer-en">{{drawerPigment.nameEn}}</view>
+          <view class="drawer-chip-wrap">
+            <text class="drawer-chip">{{drawerPigment.colorNo}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 色料 + 透明度 双栏 -->
+      <view class="drawer-info-row">
+        <view class="info-card info-card-half">
+          <view class="info-label">色料</view>
+          <view class="info-value mono">{{drawerPigment.pigment || '—'}}</view>
+        </view>
+        <view class="info-card info-card-half transparency-card">
+          <view class="info-label">透明度</view>
+          <view class="transparency-row">
+            <view class="transparency-text">
+              <view class="transparency-cn">{{drawerTransCn}}</view>
+              <view class="transparency-en">{{drawerPigment.transparency || '—'}}</view>
+            </view>
+            <view class="transparency-dot" style="background: {{drawerTransDot}};"></view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 色卡条 -->
+      <view class="info-card swatch-card">
+        <view class="info-label">色卡</view>
+        <view wx:if="{{drawerPigment.swatch}}" class="swatch-bar" style="background: {{drawerPigment.swatch}};"></view>
+        <view wx:else class="swatch-bar swatch-bar-empty">无色卡</view>
+      </view>
+
+      <!-- 双行动按钮 -->
+      <view class="drawer-actions">
+        <view
+          wx:if="{{drawerPigment.owned}}"
+          class="drawer-action-btn wishlist disabled"
+        >
+          <text class="drawer-action-icon">★</text>
+          <text class="drawer-action-text">加入心愿单</text>
+        </view>
+        <view
+          wx:elif="{{drawerPigment.wishlist}}"
+          class="drawer-action-btn wishlist active"
+          bindtap="onDrawerToggleWishlist"
+          hover-class="action-btn-hover"
+        >
+          <text class="drawer-action-icon">★</text>
+          <text class="drawer-action-text">已加入心愿单</text>
+        </view>
+        <view
+          wx:else
+          class="drawer-action-btn wishlist"
+          bindtap="onDrawerToggleWishlist"
+          hover-class="action-btn-hover"
+        >
+          <text class="drawer-action-icon">★</text>
+          <text class="drawer-action-text">加入心愿单</text>
+        </view>
+
+        <view
+          class="drawer-action-btn owned-btn {{drawerPigment.owned ? 'secondary' : 'primary'}}"
+          bindtap="onDrawerToggleOwned"
+          hover-class="action-btn-hover"
+        >
+          <text class="drawer-action-icon">{{drawerPigment.owned ? '−' : '+'}}</text>
+          <text class="drawer-action-text">{{drawerPigment.owned ? '取消拥有' : '标记为已拥有'}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- Toast -->
+  <view class="toast {{toastVisible ? 'show' : ''}}">
+    <text class="toast-icon">✓</text>
+    <text class="toast-text">{{toastText}}</text>
   </view>
 </view>

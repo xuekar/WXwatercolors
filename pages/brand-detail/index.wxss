@@ -503,23 +503,30 @@
   margin-bottom: 32rpx;
 }
 
-.drawer-swatch {
-  width: 128rpx;
-  height: 128rpx;
-  border-radius: 24rpx;
-  border: 1rpx solid rgba(0, 0, 0, 0.06);
+/* V4: 品牌 ICON 替代色卡 */
+.drawer-brand-icon {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 28rpx;
   flex-shrink: 0;
-  box-shadow: inset 0 1rpx 2rpx rgba(255, 255, 255, 0.3);
-}
-.drawer-swatch-empty {
-  border: 2rpx dashed #DDDDDD;
-  background: #FAFAFA;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 22rpx;
-  color: #BBBBBB;
-  box-shadow: none;
+  color: #FFFFFF;
+}
+.drawer-brand-abbr {
+  font-size: 36rpx;
+  font-weight: 500;
+  color: #FFFFFF;
+  line-height: 1;
+}
+.drawer-brand-cn {
+  font-size: 20rpx;
+  color: #FFFFFF;
+  opacity: 0.85;
+  margin-top: 12rpx;
+  line-height: 1;
 }
 
 .drawer-meta {
@@ -691,6 +698,112 @@
 }
 .action-btn-hover {
   opacity: 0.85;
+}
+
+/* ===== V4 抽屉新增：色料+透明度 双栏 ===== */
+.drawer-info-row {
+  display: flex;
+  gap: 16rpx;
+  margin-bottom: 20rpx;
+}
+.info-card-half {
+  flex: 1;
+  margin-bottom: 0;
+  min-width: 0;
+}
+.info-card-half.transparency-card {
+  margin-bottom: 0;
+}
+
+/* ===== V4 抽屉新增：色卡条（纯色彩） ===== */
+.swatch-card {
+  margin-bottom: 32rpx;
+}
+.swatch-bar {
+  width: 100%;
+  height: 80rpx;
+  border-radius: 14rpx;
+  border: 1rpx solid rgba(0, 0, 0, 0.06);
+}
+.swatch-bar-empty {
+  border: 2rpx dashed #DDDDDD;
+  background: #FAFAFA;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22rpx;
+  color: #BBBBBB;
+}
+
+/* ===== V4 抽屉新增：双行动按钮（心愿单 + 已拥有） ===== */
+.drawer-actions {
+  display: flex;
+  gap: 16rpx;
+}
+.drawer-action-btn {
+  flex: 1;
+  height: 88rpx;
+  border-radius: 20rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  font-size: 28rpx;
+  transition: opacity 0.15s, background 0.15s;
+  box-sizing: border-box;
+}
+.drawer-action-btn .drawer-action-icon {
+  font-size: 30rpx;
+  line-height: 1;
+}
+.drawer-action-btn .drawer-action-text {
+  font-size: 28rpx;
+  font-weight: 500;
+}
+
+/* 心愿单按钮 */
+.drawer-action-btn.wishlist {
+  background: #FFFFFF;
+  border: 2rpx solid #0052D9;
+}
+.drawer-action-btn.wishlist .drawer-action-icon,
+.drawer-action-btn.wishlist .drawer-action-text {
+  color: #0052D9;
+}
+.drawer-action-btn.wishlist.active {
+  background: #FFF4E6;
+  border-color: #FFA940;
+}
+.drawer-action-btn.wishlist.active .drawer-action-icon,
+.drawer-action-btn.wishlist.active .drawer-action-text {
+  color: #D17B00;
+}
+.drawer-action-btn.wishlist.disabled {
+  background: #F5F5F5;
+  border: 1rpx solid #DCDCDC;
+  pointer-events: none;
+}
+.drawer-action-btn.wishlist.disabled .drawer-action-icon,
+.drawer-action-btn.wishlist.disabled .drawer-action-text {
+  color: #BBBBBB;
+}
+
+/* 已拥有按钮 */
+.drawer-action-btn.owned-btn.primary {
+  background: #0052D9;
+  border: 2rpx solid #0052D9;
+}
+.drawer-action-btn.owned-btn.primary .drawer-action-icon,
+.drawer-action-btn.owned-btn.primary .drawer-action-text {
+  color: #FFFFFF;
+}
+.drawer-action-btn.owned-btn.secondary {
+  background: #FFFFFF;
+  border: 1rpx solid #DCDCDC;
+}
+.drawer-action-btn.owned-btn.secondary .drawer-action-icon,
+.drawer-action-btn.owned-btn.secondary .drawer-action-text {
+  color: #555;
 }
 
 /* ===== 已应用筛选条件 chip 区 ===== */

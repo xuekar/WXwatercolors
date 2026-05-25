@@ -1,6 +1,6 @@
 // utils/data.js — 主包数据中心
 // 仅持有品牌元数据 + 从 globalData 读取 owned 统计
-// 颜料原始数据在子包 subpkg-detail/data/ 中，详情页通过 pigment-store.js 访问
+// 颜料原始数据在 utils/data/ 中，详情页通过 utils/pigment-store.js 访问
 
 const BRANDS = [
   { id: 1, nameCn: '温莎牛顿',     nameEn: 'Winsor & Newton',     iconText: 'W&N', color: 'linear-gradient(135deg, #B22234, #7A1521)', colorNo: 1 },
@@ -11,17 +11,21 @@ const BRANDS = [
   { id: 6, nameCn: 'M. Graham',    nameEn: 'M. Graham & Co.',      iconText: 'MG',  color: 'linear-gradient(135deg, #6A4C93, #432B6A)', colorNo: 6 },
 ];
 
-// 各品牌总颜料数（与 subpkg-detail/data/*.js 中的实际条数保持一致）
 const BRAND_TOTAL = { 1: 116, 2: 188, 3: 190, 4: 181, 5: 135, 6: 72 };
+const TOTAL_PIGMENTS = Object.values(BRAND_TOTAL).reduce((s, n) => s + n, 0);
 
 function _getOwnedCount(brandId) {
   const app = getApp();
   if (!app || !app.globalData || !app.globalData.ownedCounts) return 0;
   return app.globalData.ownedCounts[brandId] || 0;
 }
+function _getWishlistCount(brandId) {
+  const app = getApp();
+  if (!app || !app.globalData || !app.globalData.wishlistCounts) return 0;
+  return app.globalData.wishlistCounts[brandId] || 0;
+}
 
 module.exports = {
-  // 获取所有品牌（统计实时从 globalData.ownedCounts 读取）
   getBrands() {
     return BRANDS.map(b => {
       const ownedCount = _getOwnedCount(b.id);
@@ -33,7 +37,6 @@ module.exports = {
       };
     });
   },
-  // 获取某品牌元数据 + 统计
   getBrand(id) {
     const b = BRANDS.find(x => x.id === Number(id));
     if (!b) return null;
@@ -44,5 +47,30 @@ module.exports = {
       totalCount: BRAND_TOTAL[b.id] || 0,
       owned: ownedCount > 0,
     };
+  },
+  // 跨品牌全局统计：用于色彩库子 Tab 计数
+  getGlobalStat() {
+    let owned = 0, wish = 0;
+    BRANDS.forEach(b => {
+      owned += _getOwnedCount(b.id);
+      wish += _getWishlistCount(b.id);
+    });
+    return {
+      ownedCount: owned,
+      wishlistCount: wish,
+      unownedCount: TOTAL_PIGMENTS - owned,
+      totalCount: TOTAL_PIGMENTS,
+    };
+  },
+  // 品牌元数据（不带统计），用于色彩库筛选弹层快速读取
+  getBrandsMeta() {
+    return BRANDS.map(b => ({
+      id: b.id,
+      nameCn: b.nameCn,
+      nameEn: b.nameEn,
+      iconText: b.iconText,
+      color: b.color,
+      totalCount: BRAND_TOTAL[b.id] || 0,
+    }));
   },
 };

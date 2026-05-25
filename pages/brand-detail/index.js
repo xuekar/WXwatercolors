@@ -425,7 +425,9 @@ Page({
     if (!cur) return;
     const nextOwned = !cur.owned;
     this._pigments = this._pigments.map(p =>
-      p.id === cur.id ? { ...p, owned: nextOwned, checked: nextOwned } : p
+      p.id === cur.id
+        ? { ...p, owned: nextOwned, checked: nextOwned, wishlist: nextOwned ? false : p.wishlist }
+        : p
     );
     pigmentStore.savePigments(this.data.brandId, this._pigments);
     const updated = this._pigments.find(p => p.id === cur.id);
@@ -434,13 +436,32 @@ Page({
       this.showToast(nextOwned ? '已添加到拥有' : '已取消拥有');
     });
   },
+
+  // 切换心愿单（仅未拥有时可用，互斥规则在保存层兜底）
+  onDrawerToggleWishlist() {
+    const cur = this.data.drawerPigment;
+    if (!cur || cur.owned) return;
+    const nextWish = !cur.wishlist;
+    this._pigments = this._pigments.map(p =>
+      p.id === cur.id ? { ...p, wishlist: nextWish } : p
+    );
+    pigmentStore.savePigments(this.data.brandId, this._pigments);
+    const updated = this._pigments.find(p => p.id === cur.id);
+    this.setData({ drawerPigment: updated }, () => {
+      this.showToast(nextWish ? '已加入心愿单' : '已移出心愿单');
+    });
+  },
   onToggleAll() {
     const target = !this.data.allSelected;
     this._pigments = this._pigments.map(p => ({ ...p, checked: target }));
     this.applyFilterAndSort();
   },
   onSave() {
-    this._pigments = this._pigments.map(p => ({ ...p, owned: p.checked }));
+    this._pigments = this._pigments.map(p => ({
+      ...p,
+      owned: p.checked,
+      wishlist: p.checked ? false : p.wishlist,  // 已拥有时强制清空心愿单
+    }));
     pigmentStore.savePigments(this.data.brandId, this._pigments);
     const ownedCount = this._pigments.filter(p => p.owned).length;
     this.setData({ markMode: false }, () => {
