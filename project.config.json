@@ -10,9 +10,9 @@
     "urlCheck": false,
     "scopeDataCheck": false,
     "coverView": true,
-    "es6": false,
+    "es6": true,
     "postcss": true,
-    "enhance": false,
+    "enhance": true,
     "compileHotReLoad": false,
     "lazyloadPlaceholderEnable": false,
     "preloadBackgroundData": false,
@@ -48,12 +48,14 @@
   },
   "compileType": "miniprogram",
   "libVersion": "3.0.0",
-  "appid": "wx7329b68155aa5161",
+  "appid": "wxd24dc0c7f9bf36b5",
   "projectname": "watercolor-miniprogram",
+  "cloudfunctionRoot": "cloudfunctions/",
   "condition": {},
   "editorSetting": {
     "tabIndent": "insertSpaces",
     "tabSize": 2
   },
-  "simulatorPluginLibVersion": {}
+  "simulatorPluginLibVersion": {},
+  "cloudfunctionTemplateRoot": "cloudfunctionTemplate/"
 }

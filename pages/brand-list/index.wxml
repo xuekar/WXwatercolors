@@ -27,6 +27,14 @@
       <view class="tab-label">今日签</view>
       <view class="tab-bar"></view>
     </view>
+    <view
+      class="tab {{activeTab === 'scheme' ? 'active scheme' : ''}}"
+      data-tab="scheme"
+      bindtap="onTabChange"
+    >
+      <view class="tab-label">色彩方</view>
+      <view class="tab-bar"></view>
+    </view>
   </view>
 
   <!-- ============ 模式 1：品牌视图（全部品牌） ============ -->
@@ -297,6 +305,27 @@
             <text>重新抽签</text>
           </view>
         </view>
+
+        <!-- 保存为色彩方案（V4 新增，紫色主按钮 + 进度条） -->
+        <view wx:if="{{lotteryHasResult}}" class="lottery-save-section">
+          <view
+            class="lottery-save-btn {{lotterySaveDisabled ? 'disabled' : ''}}"
+            bindtap="onLotterySaveTap"
+            hover-class="{{lotterySaveDisabled ? '' : 'lottery-save-btn-hover'}}"
+          >
+            <text class="lottery-save-icon">{{lotterySaveDisabled ? '✓' : '+'}}</text>
+            <text>{{lotterySaveDisabled ? '已保存到色彩方' : '保存为色彩方案'}}</text>
+          </view>
+          <view class="lottery-save-meta">
+            <view class="lottery-save-meta-row">
+              <text class="lottery-save-meta-label">已保存方案</text>
+              <text class="lottery-save-meta-count">{{lotterySchemeCount}} / {{lotterySchemeMax}}</text>
+            </view>
+            <view class="lottery-save-bar">
+              <view class="lottery-save-bar-fill" style="width: {{lotterySchemeProgress}}%"></view>
+            </view>
+          </view>
+        </view>
       </view>
     </scroll-view>
   </block>
@@ -316,6 +345,296 @@
         </view>
         <view class="filter-options-empty" wx:if="{{lotteryHistory.length === 0}}">还没有抽签记录</view>
       </scroll-view>
+    </view>
+  </view>
+
+  <!-- ============ 模式 4：色彩方 ============ -->
+  <block wx:if="{{activeTab === 'scheme'}}">
+    <view class="scheme-page">
+      <!-- 加载中 -->
+      <view wx:if="{{libLoading}}" class="loading-tip">加载中…</view>
+
+      <!-- 空态：还没有任何方案 -->
+      <view wx:elif="{{schemes.length === 0}}" class="scheme-empty">
+        <view class="scheme-empty-icon">+</view>
+        <view class="scheme-empty-title">还没有配色方案</view>
+        <view class="scheme-empty-desc">创建你的第一个配色方案\n从喜欢的颜料组合开始</view>
+        <view class="scheme-empty-btn" bindtap="onSchemeCreate" hover-class="scheme-empty-btn-hover">+ 新建方案</view>
+      </view>
+
+      <!-- 方案视图 -->
+      <block wx:else>
+        <!-- 顶部方案选择器 -->
+        <scroll-view scroll-x class="scheme-selector" enhanced show-scrollbar="{{false}}">
+          <view
+            class="scheme-tab {{activeSchemeId === item.id ? 'active' : ''}}"
+            wx:for="{{schemes}}"
+            wx:key="id"
+            data-id="{{item.id}}"
+            bindtap="onSchemeTabTap"
+            hover-class="scheme-tab-hover"
+          >{{item.name}}</view>
+          <view
+            class="scheme-tab add-btn {{schemes.length >= 10 ? 'disabled' : ''}}"
+            bindtap="onSchemeCreate"
+            hover-class="scheme-tab-hover"
+          >+</view>
+          <view class="scheme-meta">{{schemes.length}} / 10</view>
+        </scroll-view>
+
+        <!-- 方案标题 + 编辑/删除/已保存徽章 -->
+        <view class="scheme-header {{activeScheme.isSaved ? 'saved' : ''}}" wx:if="{{activeScheme}}">
+          <view class="scheme-title-row">
+            <view class="scheme-title">{{activeScheme.name}}</view>
+            <!-- 编辑态显示 ✎ 重命名按钮 -->
+            <view wx:if="{{!activeScheme.isSaved}}" class="scheme-title-edit-btn" bindtap="onSchemeRenameOpen" hover-class="scheme-icon-hover">✎</view>
+            <!-- 已保存态显示 ✓ 已保存徽章 -->
+            <view wx:else class="scheme-saved-badge">✓ 已保存</view>
+            <view class="scheme-title-delete-btn" bindtap="onSchemeDeleteCurrent" hover-class="scheme-icon-hover">🗑</view>
+          </view>
+          <view class="scheme-stat">
+            共 <text class="scheme-num">{{activeScheme.pigmentsList.length}}</text> 个颜料 ·
+            <text class="scheme-num">{{activeScheme.ownedCount}}</text> 已拥有 ·
+            <text class="scheme-num scheme-num-warn">{{activeScheme.unownedCount}}</text> 未拥有 · 上限 48
+          </view>
+          <view wx:if="{{activeScheme.isSaved}}" class="scheme-stat-saved">最后保存：{{activeScheme.savedAtStr}}</view>
+        </view>
+
+        <!-- 颜料网格 -->
+        <scroll-view scroll-y class="scheme-grid-section" wx:if="{{activeScheme}}">
+          <view class="scheme-grid">
+            <view
+              class="scheme-card {{!item.owned ? 'unowned' : ''}}"
+              wx:for="{{activeScheme.pigmentsList}}"
+              wx:key="_gid"
+            >
+              <!-- 仅编辑态显示 × 删除按钮 -->
+              <view
+                wx:if="{{!activeScheme.isSaved}}"
+                class="scheme-card-delete"
+                data-gid="{{item._gid}}"
+                catchtap="onSchemeRemovePigment"
+                hover-class="scheme-icon-hover"
+              >×</view>
+              <view wx:if="{{!item.owned}}" class="scheme-unowned-badge">未拥有</view>
+              <view class="scheme-swatch" style="background: {{item.swatch || '#FAFAFA'}};">
+                <text class="scheme-brand-badge">{{item._brandAbbr}}</text>
+              </view>
+              <view class="scheme-name">{{item.nameCn}}</view>
+              <view class="scheme-color-no">{{item.colorNo}}</view>
+            </view>
+            <!-- 添加占位卡（仅编辑态 + 未达上限时显示） -->
+            <view
+              wx:if="{{!activeScheme.isSaved && activeScheme.canAdd}}"
+              class="scheme-card-add"
+              bindtap="onSchemeAddBrandOpen"
+              hover-class="scheme-card-add-hover"
+            >
+              <view class="scheme-card-add-icon">+</view>
+              <view class="scheme-card-add-text">添加颜料</view>
+            </view>
+          </view>
+          <view wx:if="{{!activeScheme.isSaved && !activeScheme.canAdd}}" class="scheme-limit-tip">
+            ⚠ 此方案已达 48 个上限，删除一些颜料才能继续添加
+          </view>
+          <!-- 已保存态空方案兜底 -->
+          <view wx:if="{{activeScheme.isSaved && activeScheme.pigmentsList.length === 0}}" class="scheme-saved-empty">
+            该方案暂无颜料，点击「修改方案」添加
+          </view>
+        </scroll-view>
+
+        <!-- 底部操作栏：编辑态 vs 已保存态 -->
+        <view class="scheme-footer" wx:if="{{activeScheme}}">
+          <!-- 编辑态：保存方案 -->
+          <block wx:if="{{!activeScheme.isSaved}}">
+            <view class="scheme-footer-tip">还未保存 · 离开页面将丢失改动</view>
+            <view class="scheme-footer-bar">
+              <view class="scheme-footer-btn primary" bindtap="onSchemeSave" hover-class="scheme-footer-btn-hover">
+                <text class="scheme-footer-icon">💾</text>
+                <text>保存方案</text>
+              </view>
+            </view>
+          </block>
+          <!-- 已保存态：分享 + 修改方案 -->
+          <block wx:else>
+            <view class="scheme-footer-bar">
+              <view class="scheme-footer-btn gray" bindtap="onSchemeShare" hover-class="scheme-footer-btn-hover">
+                <text class="scheme-footer-icon">📤</text>
+                <text>分享</text>
+              </view>
+              <view class="scheme-footer-btn outline" bindtap="onSchemeEnterEdit" hover-class="scheme-footer-btn-hover">
+                <text class="scheme-footer-icon">✎</text>
+                <text>修改方案</text>
+              </view>
+            </view>
+          </block>
+        </view>
+      </block>
+    </view>
+  </block>
+
+  <!-- 添加颜料 - Step 1 选品牌 -->
+  <view class="mask {{schemeAddBrandVisible ? 'show' : ''}}" bindtap="onSchemeAddBrandClose">
+    <view class="filter-panel filter-panel-tall scheme-popup {{schemeAddBrandVisible ? 'show' : ''}}" catchtap="noop">
+      <view class="filter-handle"></view>
+      <view class="scheme-popup-header">
+        <view class="scheme-popup-title">选择品牌</view>
+        <view class="scheme-popup-step">第 1 步 / 共 2 步</view>
+      </view>
+      <scroll-view scroll-y class="filter-options-scroll">
+        <view
+          class="scheme-brand-row"
+          wx:for="{{schemeAddBrandList}}"
+          wx:key="id"
+          data-id="{{item.id}}"
+          bindtap="onSchemeAddBrandTap"
+          hover-class="scheme-brand-row-hover"
+        >
+          <view class="scheme-brand-icon" style="background: {{item.color}};">
+            <text class="scheme-brand-abbr">{{item.iconText}}</text>
+            <text class="scheme-brand-cn-mini">{{item.nameCn}}</text>
+          </view>
+          <view class="scheme-brand-info">
+            <view class="scheme-brand-name">{{item.nameCn}}</view>
+            <view class="scheme-brand-en">{{item.nameEn}} · {{item.colorCount}} 色</view>
+          </view>
+          <view class="scheme-brand-arrow">›</view>
+        </view>
+      </scroll-view>
+    </view>
+  </view>
+
+  <!-- 添加颜料 - Step 2 选色号 -->
+  <view class="mask {{schemeAddColorVisible ? 'show' : ''}}" bindtap="onSchemeAddColorClose">
+    <view class="filter-panel filter-panel-tall scheme-popup {{schemeAddColorVisible ? 'show' : ''}}" catchtap="noop">
+      <view class="filter-handle"></view>
+      <view class="scheme-popup-header">
+        <view class="scheme-popup-title">
+          <text class="scheme-popup-back" bindtap="onSchemeAddColorBack">‹</text>
+          {{schemeAddSelectedBrandName}} · 选色号
+        </view>
+        <view class="scheme-popup-step">第 2 步 / 共 2 步</view>
+      </view>
+      <view class="filter-search">
+        <input
+          class="filter-search-input"
+          placeholder="搜索色号或名称（如 PB28 / 钴蓝）"
+          value="{{schemeAddColorSearch}}"
+          bindinput="onSchemeAddColorSearch"
+        />
+      </view>
+      <scroll-view scroll-y class="filter-options-scroll">
+        <view
+          class="scheme-color-row {{item.added ? 'added' : ''}}"
+          wx:for="{{schemeAddColorListFiltered}}"
+          wx:key="_gid"
+          data-gid="{{item._gid}}"
+          bindtap="onSchemeAddColorTap"
+          hover-class="scheme-color-row-hover"
+        >
+          <view class="scheme-color-swatch" style="background: {{item.swatch || '#FAFAFA'}};"></view>
+          <view class="scheme-color-info">
+            <view class="scheme-color-meta">
+              <text class="scheme-color-no-tag">{{item.colorNo}}</text>
+            </view>
+            <view class="scheme-color-name">{{item.nameCn}}</view>
+            <view class="scheme-color-en">{{item.nameEn}}</view>
+          </view>
+          <view wx:if="{{item.added}}" class="scheme-color-state added">已添加</view>
+          <view wx:elif="{{item.owned}}" class="scheme-color-state owned">已拥有</view>
+          <view wx:else class="scheme-color-state unowned">未拥有</view>
+        </view>
+        <view class="filter-options-empty" wx:if="{{schemeAddColorListFiltered.length === 0}}">无匹配颜料</view>
+      </scroll-view>
+    </view>
+  </view>
+
+  <!-- 重命名 dialog -->
+  <view class="rename-mask {{schemeRenameVisible ? 'show' : ''}}" bindtap="onSchemeRenameClose">
+    <view class="rename-dialog" catchtap="noop">
+      <view class="rename-title">修改方案名称</view>
+      <view class="rename-desc">名称将通过微信安全检测后保存</view>
+      <input
+        class="rename-input"
+        placeholder="请输入方案名称"
+        value="{{schemeRenameInput}}"
+        bindinput="onSchemeRenameInput"
+        maxlength="5"
+        focus="{{schemeRenameVisible}}"
+        confirm-type="done"
+      />
+      <view class="rename-tip">
+        <text>{{schemeRenameInput.length}} / 5</text>
+        <text wx:if="{{schemeRenameChecking}}" class="rename-checking">⏱ 安全检测中...</text>
+      </view>
+      <view class="rename-actions">
+        <view class="rename-btn secondary" bindtap="onSchemeRenameClose" hover-class="rename-btn-hover">取消</view>
+        <view
+          class="rename-btn primary {{schemeRenameChecking ? 'loading' : ''}}"
+          bindtap="onSchemeRenameSave"
+          hover-class="rename-btn-hover"
+        >保存</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 今日签 → 保存为色彩方案 命名 popup（底部抽屉） -->
+  <view class="mask {{lotterySaveVisible ? 'show' : ''}}" bindtap="onLotterySaveClose">
+    <view class="lottery-save-panel {{lotterySaveVisible ? 'show' : ''}}" catchtap="noop">
+      <view class="filter-handle"></view>
+      <view class="lottery-save-title">保存为色彩方案</view>
+      <view class="lottery-save-subtitle">将本次 {{lotteryDrawn.length}} 色保存到「色彩方」</view>
+
+      <view class="lottery-save-field-label">
+        <text>方案名称</text>
+        <text class="lottery-save-field-count">{{lotterySaveInput.length}} / 5</text>
+      </view>
+      <input
+        class="lottery-save-input"
+        placeholder="请输入方案名称"
+        value="{{lotterySaveInput}}"
+        bindinput="onLotterySaveInput"
+        maxlength="5"
+        focus="{{lotterySaveVisible}}"
+        confirm-type="done"
+      />
+
+      <view class="lottery-save-preview-label">本次抽取颜色</view>
+      <scroll-view scroll-x class="lottery-save-preview" enhanced show-scrollbar="{{false}}">
+        <view
+          class="lottery-save-preview-item"
+          wx:for="{{lotteryDrawn}}"
+          wx:key="_gid"
+          style="background: {{item.swatch || '#FAFAFA'}}"
+        ></view>
+      </scroll-view>
+
+      <view class="lottery-save-tip">
+        <text wx:if="{{lotterySaveChecking}}" class="rename-checking">⏱ 安全检测中...</text>
+        <text wx:else>已用 {{lotterySchemeCount}} / {{lotterySchemeMax}} 个方案位</text>
+      </view>
+
+      <view class="lottery-save-actions">
+        <view class="lottery-save-action-btn secondary" bindtap="onLotterySaveClose" hover-class="rename-btn-hover">取消</view>
+        <view
+          class="lottery-save-action-btn primary {{lotterySaveChecking ? 'loading' : ''}}"
+          bindtap="onLotterySaveConfirm"
+          hover-class="rename-btn-hover"
+        >确认保存</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 今日签 → 方案数量已达上限 dialog -->
+  <view class="rename-mask {{lotterySaveLimitVisible ? 'show' : ''}}" bindtap="onLotterySaveLimitClose">
+    <view class="rename-dialog" catchtap="noop">
+      <view class="lottery-limit-icon">!</view>
+      <view class="rename-title">方案数量已达上限</view>
+      <view class="lottery-limit-desc">色彩方最多保存 {{lotterySchemeMax}} 个方案，当前已有 {{lotterySchemeCount}} 个，请先到「色彩方」删除至少 1 个方案后再保存。</view>
+      <view class="rename-actions">
+        <view class="rename-btn secondary" bindtap="onLotterySaveLimitClose" hover-class="rename-btn-hover">我知道了</view>
+        <view class="rename-btn lottery-limit-primary" bindtap="onLotterySaveLimitGoto" hover-class="rename-btn-hover">前往管理</view>
+      </view>
     </view>
   </view>
 

@@ -7,6 +7,23 @@ const STORAGE_KEY = 'wc_user_states_v1';
 App({
   onLaunch() {
     console.log('[app] onLaunch', _now());
+
+    // 初始化云开发（用于 msgSecCheck 内容安全检测）
+    // 若未开通云开发，会自动降级（_msgSecCheck 中已做容错）
+    if (wx.cloud) {
+      try {
+        wx.cloud.init({ env: 'cloud1-d6gd6kerl873e0d0c', traceUser: true });
+        this.globalData.cloudInited = true;
+        console.log('[app] wx.cloud 初始化成功');
+      } catch (err) {
+        console.warn('[app] wx.cloud 初始化失败，msgSecCheck 将本地降级', err);
+        this.globalData.cloudInited = false;
+      }
+    } else {
+      console.warn('[app] 当前基础库不支持 wx.cloud');
+      this.globalData.cloudInited = false;
+    }
+
     // 启动时预热：从本地存储读取用户标记状态，按品牌算出 owned/wishlist 计数
     // 写入 globalData，让品牌列表页第一帧就能拿到正确的拥有数（无需等颜料数据加载）
     if (!this.globalData.ownedCounts) this.globalData.ownedCounts = {};
@@ -42,5 +59,6 @@ App({
     userId: 'demo',
     ownedCounts: {},
     wishlistCounts: {},
+    cloudInited: false,
   }
 });

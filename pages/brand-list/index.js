@@ -97,6 +97,34 @@ Page({
     ownedPoolCount: 0,         // 当前已拥有数量（供初始态展示）
     lotteryAnimating: false,   // 抽签动画中
     lotteryEmpty: '',          // 边界提示（已拥有不足/去重过严）
+    lotterySchemeCount: 0,     // 当前已保存方案数（用于今日签结果页进度条）
+    lotterySchemeMax: 10,      // 方案上限
+    lotterySchemeProgress: 0,  // 进度条宽度百分比 0-100
+    lotterySaveDisabled: false, // 当前抽取结果是否已保存（保存后置灰禁用）
+
+    // 「保存方案」命名 popup
+    lotterySaveVisible: false,
+    lotterySaveInput: '',
+    lotterySaveChecking: false,
+
+    // 「方案数量超限」提示 dialog
+    lotterySaveLimitVisible: false,
+
+    // ===== 色彩方 Color Scheme =====
+    schemes: [],                // 全部方案数组
+    activeSchemeId: 0,          // 当前选中方案 id
+    activeScheme: null,         // 当前方案完整数据（含 pigments 详细字段）
+    schemeAddBrandVisible: false,  // 添加流 Step 1 弹层
+    schemeAddColorVisible: false,  // 添加流 Step 2 弹层
+    schemeAddSelectedBrandId: 0,   // Step 2 当前品牌
+    schemeAddSelectedBrandName: '',
+    schemeAddBrandList: [],     // Step 1 品牌列表
+    schemeAddColorList: [],     // Step 2 颜料列表（已注入状态）
+    schemeAddColorSearch: '',   // Step 2 搜索 keyword
+    schemeAddColorListFiltered: [],
+    schemeRenameVisible: false,
+    schemeRenameInput: '',
+    schemeRenameChecking: false,
   },
 
   onLoad() {
@@ -108,6 +136,9 @@ Page({
       }
     } catch (e) {}
     this._updateLotteryMiniText();
+    // 加载色彩方
+    this._loadSchemes();
+    this._refreshLotterySchemeProgress();
     this.refresh();
   },
 
@@ -117,9 +148,9 @@ Page({
       if (this.data.activeTab === 'library') {
         this._reloadLibraryDataIfNeeded();
       } else if (this.data.activeTab === 'lottery') {
-        // 重新进入今日签也走 _enterLottery 重建逻辑，
-        // 确保从详情页改完已拥有后回来能看到最新池子
         this._enterLottery();
+      } else if (this.data.activeTab === 'scheme') {
+        this._enterScheme();
       }
     } else {
       this._loaded = true;
@@ -141,6 +172,8 @@ Page({
         this._enterLibrary();
       } else if (tab === 'lottery') {
         this._enterLottery();
+      } else if (tab === 'scheme') {
+        this._enterScheme();
       } else {
         this.applyFilter();
       }
@@ -659,6 +692,21 @@ Page({
       history = wx.getStorageSync(this._LOTTERY_HISTORY_KEY) || [];
     } catch (e) {}
     this.setData({ lotteryHistory: Array.isArray(history) ? history : [] });
+    // 同步已保存方案数（用于结果页进度条）
+    this._refreshLotterySchemeProgress();
+  },
+
+  // 刷新今日签结果页的「已保存 X / 10」进度条
+  _refreshLotterySchemeProgress() {
+    const schemes = this.data.schemes || [];
+    const max = this._SCHEME_MAX_COUNT || 10;
+    const count = schemes.length;
+    const progress = Math.min(100, Math.round((count / max) * 100));
+    this.setData({
+      lotterySchemeCount: count,
+      lotterySchemeMax: max,
+      lotterySchemeProgress: progress,
+    });
   },
 
   // 配置：展开/折叠
@@ -787,6 +835,7 @@ Page({
         lotteryHistory: newHist,
         lotteryAnimating: false,
         lotteryEmpty,
+        lotterySaveDisabled: false,  // 新一次抽取，重新允许保存
       });
     }, 600);  // 0.6s 动画
   },
@@ -794,6 +843,107 @@ Page({
   // 重新抽签
   onLotteryRedraw() {
     this.onLotteryDraw();
+  },
+
+  // ===== 今日签 → 保存为色彩方案 =====
+  // 入口：点击结果页「保存方案」按钮
+  onLotterySaveTap() {
+    if (this.data.lotterySaveDisabled) return;
+    const drawn = this.data.lotteryDrawn || [];
+    if (drawn.length === 0) return;
+    // 数量上限拦截：≥10 直接弹超限提示，不进入命名步骤
+    const schemes = this.data.schemes || [];
+    if (schemes.length >= this._SCHEME_MAX_COUNT) {
+      this.setData({ lotterySaveLimitVisible: true });
+      return;
+    }
+    // 默认方案名：MMDD签（最多 5 字，例 "525签" / "1225签"）
+    const ts = this.data.lotteryDrawnAt || Date.now();
+    const d = new Date(ts);
+    const defaultName = `${d.getMonth() + 1}${d.getDate()}签`.slice(0, 5);
+    this.setData({
+      lotterySaveVisible: true,
+      lotterySaveInput: defaultName,
+      lotterySaveChecking: false,
+    });
+  },
+
+  onLotterySaveClose() {
+    this.setData({ lotterySaveVisible: false, lotterySaveChecking: false });
+  },
+
+  onLotterySaveInput(e) {
+    let v = e.detail.value || '';
+    if (v.length > 5) v = v.slice(0, 5);
+    this.setData({ lotterySaveInput: v });
+  },
+
+  onLotterySaveConfirm() {
+    const name = (this.data.lotterySaveInput || '').trim();
+    if (!name) {
+      this.showToast('名称不能为空');
+      return;
+    }
+    if (name.length > 5) {
+      this.showToast('名称最长 5 个字');
+      return;
+    }
+    if (this.data.lotterySaveChecking) return;
+    // 二次拦截上限（防止两次抽签间手动新增方案）
+    if ((this.data.schemes || []).length >= this._SCHEME_MAX_COUNT) {
+      this.setData({ lotterySaveVisible: false, lotterySaveLimitVisible: true });
+      return;
+    }
+    this.setData({ lotterySaveChecking: true });
+    this._msgSecCheck(name).then(pass => {
+      if (!pass) {
+        this.setData({ lotterySaveChecking: false });
+        this.showToast('名称含违规内容，请修改');
+        return;
+      }
+      this._persistLotteryAsScheme(name);
+    }).catch(() => {
+      this.setData({ lotterySaveChecking: false });
+      this.showToast('检测失败，请稍后重试');
+    });
+  },
+
+  // 把当前 lotteryDrawn 写入 schemes（与色彩方完全同结构）
+  _persistLotteryAsScheme(name) {
+    const drawn = this.data.lotteryDrawn || [];
+    const gids = drawn.map(p => p._gid).filter(Boolean);
+    const now = Date.now();
+    const newScheme = {
+      id: now,
+      name,
+      pigments: gids,
+      createdAt: now,
+      updatedAt: now,
+      savedAt: now,
+    };
+    const schemes = (this.data.schemes || []).concat([newScheme]);
+    this.setData({
+      schemes,
+      lotterySaveVisible: false,
+      lotterySaveChecking: false,
+      lotterySaveDisabled: true,  // 本次抽取已保存，按钮置灰
+    }, () => {
+      this._saveSchemes();
+      this._refreshLotterySchemeProgress();
+      this.showToast('已保存到色彩方');
+    });
+  },
+
+  // 超限提示：「我知道了」
+  onLotterySaveLimitClose() {
+    this.setData({ lotterySaveLimitVisible: false });
+  },
+
+  // 超限提示：「前往管理」→ 切到色彩方 TAB
+  onLotterySaveLimitGoto() {
+    this.setData({ lotterySaveLimitVisible: false, activeTab: 'scheme' }, () => {
+      this._enterScheme();
+    });
   },
 
   // 历史记录弹层
@@ -822,4 +972,435 @@ Page({
   },
 
   noop() {},
+
+  // ============ 色彩方 Color Scheme ============
+  _SCHEMES_KEY: 'wc_schemes_v1',
+  _SCHEME_MAX_COUNT: 10,
+  _SCHEME_PIGMENT_MAX: 48,
+  _DEFAULT_SCHEME_NAMES: ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'],
+
+  _loadSchemes() {
+    try {
+      const list = wx.getStorageSync(this._SCHEMES_KEY) || [];
+      this.setData({ schemes: Array.isArray(list) ? list : [] });
+    } catch (e) {
+      this.setData({ schemes: [] });
+    }
+  },
+
+  _saveSchemes() {
+    try {
+      wx.setStorageSync(this._SCHEMES_KEY, this.data.schemes);
+    } catch (e) {
+      console.error('保存色彩方失败', e);
+    }
+  },
+
+  _enterScheme() {
+    // 确保 _allPigments 已加载（共用色彩库的全量数据）
+    if (!this._allPigments) {
+      this.setData({ libLoading: true });
+      pigmentStore.getAllPigmentsAsync().then(all => {
+        const brandsMeta = dataStore.getBrandsMeta();
+        const brandMap = {};
+        brandsMeta.forEach(b => { brandMap[b.id] = b; });
+        all.forEach(p => {
+          const b = brandMap[p.brandId];
+          p._brandColor = b ? b.color : '#888';
+          p._brandAbbr = b ? b.iconText : '';
+          p._brandCn = b ? b.nameCn : '';
+        });
+        this._allPigments = all;
+        this.setData({ libLoading: false, brandsMeta }, () => this._refreshActiveScheme());
+      });
+    } else {
+      // 已有缓存也重新读取一次（同步详情页改动）
+      pigmentStore.getAllPigmentsAsync().then(all => {
+        const brandsMeta = this.data.brandsMeta || dataStore.getBrandsMeta();
+        const brandMap = {};
+        brandsMeta.forEach(b => { brandMap[b.id] = b; });
+        all.forEach(p => {
+          const b = brandMap[p.brandId];
+          p._brandColor = b ? b.color : '#888';
+          p._brandAbbr = b ? b.iconText : '';
+          p._brandCn = b ? b.nameCn : '';
+        });
+        this._allPigments = all;
+        this._refreshActiveScheme();
+      });
+    }
+  },
+
+  // 根据当前 activeSchemeId 把存储里的颜料 _gid 映射成完整颜料数据
+  _refreshActiveScheme() {
+    const schemes = this.data.schemes || [];
+    if (schemes.length === 0) {
+      this.setData({ activeScheme: null, activeSchemeId: 0 });
+      return;
+    }
+    let cur = schemes.find(s => s.id === this.data.activeSchemeId);
+    if (!cur) cur = schemes[0];
+    const all = this._allPigments || [];
+    const pigmentMap = {};
+    all.forEach(p => { pigmentMap[p._gid] = p; });
+    const pigments = (cur.pigments || []).map(gid => pigmentMap[gid]).filter(Boolean);
+    const ownedCount = pigments.filter(p => p.owned).length;
+    const unownedCount = pigments.length - ownedCount;
+    // 已保存判断：savedAt 存在 且 updatedAt <= savedAt
+    const isSaved = !!cur.savedAt && (!(cur.updatedAt) || cur.updatedAt <= cur.savedAt);
+    let savedAtStr = '';
+    if (cur.savedAt) {
+      const d = new Date(cur.savedAt);
+      const pad = (n) => (n < 10 ? '0' + n : '' + n);
+      savedAtStr = `${d.getMonth() + 1}/${d.getDate()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+    this.setData({
+      activeSchemeId: cur.id,
+      activeScheme: {
+        ...cur,
+        pigmentsList: pigments,
+        ownedCount,
+        unownedCount,
+        canAdd: pigments.length < this._SCHEME_PIGMENT_MAX,
+        isSaved,
+        isDirty: !isSaved,
+        savedAtStr,
+      },
+    });
+  },
+
+  // 切换方案
+  onSchemeTabTap(e) {
+    const id = Number(e.currentTarget.dataset.id);
+    if (id === this.data.activeSchemeId) return;
+    this.setData({ activeSchemeId: id }, () => this._refreshActiveScheme());
+  },
+
+  // 创建新方案
+  onSchemeCreate() {
+    const schemes = this.data.schemes || [];
+    if (schemes.length >= this._SCHEME_MAX_COUNT) {
+      this.showToast(`最多 ${this._SCHEME_MAX_COUNT} 个方案，删除一些后再创建`);
+      return;
+    }
+    const idx = schemes.length;
+    const cnNum = this._DEFAULT_SCHEME_NAMES[idx] || (idx + 1);
+    const newScheme = {
+      id: Date.now(),
+      name: `配色方案${cnNum}`,
+      pigments: [],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    const newList = schemes.concat([newScheme]);
+    this.setData({ schemes: newList, activeSchemeId: newScheme.id }, () => {
+      this._saveSchemes();
+      this._refreshActiveScheme();
+    });
+  },
+
+  // ===== 保存方案：写入 savedAt，进入「已保存」只读态 =====
+  onSchemeSave() {
+    const id = this.data.activeSchemeId;
+    if (!id) return;
+    const now = Date.now();
+    const schemes = this.data.schemes.map(s =>
+      s.id === id ? { ...s, savedAt: now, updatedAt: now } : s
+    );
+    this.setData({ schemes }, () => {
+      this._saveSchemes();
+      this._refreshActiveScheme();
+      this.showToast('已保存');
+    });
+  },
+
+  // ===== 进入编辑态：仅切 UI，不改 storage（清除 savedAt 让 isSaved=false） =====
+  onSchemeEnterEdit() {
+    const id = this.data.activeSchemeId;
+    if (!id) return;
+    const schemes = this.data.schemes.map(s =>
+      s.id === id ? { ...s, savedAt: null, updatedAt: Date.now() } : s
+    );
+    this.setData({ schemes }, () => {
+      this._saveSchemes();
+      this._refreshActiveScheme();
+    });
+  },
+
+  // ===== 分享方案（占位：使用 wx.showShareMenu / showActionSheet）=====
+  onSchemeShare() {
+    const cur = this.data.activeScheme;
+    if (!cur) return;
+    const names = (cur.pigmentsList || []).map(p => `${p._brandAbbr} ${p.colorNo} ${p.nameCn}`).join('\n');
+    wx.setClipboardData({
+      data: `${cur.name}\n共 ${cur.pigmentsList.length} 个颜料\n\n${names}`,
+      success: () => this.showToast('方案已复制到剪贴板'),
+    });
+  },
+
+  // ===== 重命名 =====
+  onSchemeRenameOpen() {
+    const cur = this.data.activeScheme;
+    if (!cur) return;
+    this.setData({
+      schemeRenameVisible: true,
+      schemeRenameInput: cur.name,
+      schemeRenameChecking: false,
+    });
+  },
+  onSchemeRenameClose() {
+    this.setData({ schemeRenameVisible: false, schemeRenameChecking: false });
+  },
+  onSchemeRenameInput(e) {
+    let v = e.detail.value || '';
+    if (v.length > 5) v = v.slice(0, 5);
+    this.setData({ schemeRenameInput: v });
+  },
+  onSchemeRenameSave() {
+    const name = (this.data.schemeRenameInput || '').trim();
+    if (!name) {
+      this.showToast('名称不能为空');
+      return;
+    }
+    if (name.length > 5) {
+      this.showToast('名称最长 5 个字符');
+      return;
+    }
+    if (this.data.schemeRenameChecking) return;
+    this.setData({ schemeRenameChecking: true });
+    this._msgSecCheck(name).then(pass => {
+      if (!pass) {
+        this.setData({ schemeRenameChecking: false });
+        this.showToast('名称含违规内容，请修改');
+        return;
+      }
+      // 保存
+      const id = this.data.activeSchemeId;
+      const schemes = this.data.schemes.map(s =>
+        s.id === id ? { ...s, name, updatedAt: Date.now() } : s
+      );
+      this.setData({
+        schemes,
+        schemeRenameVisible: false,
+        schemeRenameChecking: false,
+      }, () => {
+        this._saveSchemes();
+        this._refreshActiveScheme();
+        this.showToast('已保存');
+      });
+    }).catch(() => {
+      this.setData({ schemeRenameChecking: false });
+      this.showToast('检测失败，请稍后重试');
+    });
+  },
+
+  // 调用 msgSecCheck 云函数进行内容安全检测
+  // 策略：调用失败/未部署时降级放行（不阻塞用户），仅在明确命中违规时返回 false
+  // resolve(true) 表示通过；resolve(false) 表示违规
+  _msgSecCheck(content) {
+    // 基础前置过滤（特殊字符/转义）
+    if (/[<>&"'\\\/]/.test(content)) {
+      return Promise.resolve(false);
+    }
+    const app = getApp();
+    const cloudReady = app && app.globalData && app.globalData.cloudInited && wx.cloud;
+    if (!cloudReady) {
+      console.warn('[msgSecCheck] 云开发未初始化，本地降级放行');
+      return Promise.resolve(true);
+    }
+    return wx.cloud.callFunction({
+      name: 'wxSecCheck',
+      data: { content, scene: 2 },
+    }).then((res) => {
+      const r = res && res.result;
+      console.log('[msgSecCheck] 云函数返回', r);
+      if (!r) {
+        console.warn('[msgSecCheck] 云函数无返回，降级放行');
+        return true;
+      }
+      // 明确通过
+      if (r.errcode === 0) {
+        if (r.detail && r.detail.suggest && r.detail.suggest === 'risky') {
+          console.log('[msgSecCheck] 命中违规 suggest=risky');
+          return false;
+        }
+        return true;
+      }
+      // 明确违规
+      if (r.errcode === 87014) {
+        console.log('[msgSecCheck] 命中违规 errcode=87014');
+        return false;
+      }
+      // 其他错误（接口异常/未部署）：降级放行，不阻塞用户
+      console.warn('[msgSecCheck] 接口返回异常，降级放行', r);
+      return true;
+    }).catch((err) => {
+      // 云函数未部署 / 网络异常 / openid 缺失 等：降级放行
+      console.warn('[msgSecCheck] 云函数调用失败，降级放行', err);
+      return true;
+    });
+  },
+
+  // ===== 添加颜料：Step 1 选品牌 =====
+  onSchemeAddBrandOpen() {
+    const cur = this.data.activeScheme;
+    if (!cur) return;
+    if (cur.pigmentsList.length >= this._SCHEME_PIGMENT_MAX) {
+      this.showToast(`每方案最多 ${this._SCHEME_PIGMENT_MAX} 个颜料`);
+      return;
+    }
+    const brandsMeta = this.data.brandsMeta || [];
+    // 计算每个品牌的总数（已加载到 _allPigments 时按 brandId 统计）
+    const brandList = brandsMeta.map(b => ({
+      ...b,
+      colorCount: (this._allPigments || []).filter(p => p.brandId === b.id).length,
+    }));
+    this.setData({
+      schemeAddBrandVisible: true,
+      schemeAddBrandList: brandList,
+    });
+  },
+  onSchemeAddBrandClose() {
+    this.setData({ schemeAddBrandVisible: false });
+  },
+
+  // ===== Step 2 选色号 =====
+  onSchemeAddBrandTap(e) {
+    const id = Number(e.currentTarget.dataset.id);
+    const b = (this.data.schemeAddBrandList || []).find(x => x.id === id);
+    if (!b) return;
+    const all = this._allPigments || [];
+    const cur = this.data.activeScheme;
+    const existedGids = (cur.pigmentsList || []).map(p => p._gid);
+    const colorList = all
+      .filter(p => p.brandId === id)
+      .map(p => ({
+        _gid: p._gid,
+        id: p.id,
+        colorNo: p.colorNo,
+        nameCn: p.nameCn,
+        nameEn: p.nameEn,
+        swatch: p.swatch,
+        owned: !!p.owned,
+        added: existedGids.indexOf(p._gid) !== -1,
+      }))
+      .sort((a, b) => {
+        const m = (s) => {
+          const r = String(s).match(/^([A-Za-z]*)(\d+)/);
+          return r ? { p: r[1].toUpperCase(), n: parseInt(r[2], 10) } : { p: s, n: 0 };
+        };
+        const A = m(a.colorNo), B = m(b.colorNo);
+        if (A.p !== B.p) return A.p.localeCompare(B.p);
+        return A.n - B.n;
+      });
+    this.setData({
+      schemeAddBrandVisible: false,
+      schemeAddColorVisible: true,
+      schemeAddSelectedBrandId: id,
+      schemeAddSelectedBrandName: b.nameCn,
+      schemeAddColorList: colorList,
+      schemeAddColorListFiltered: colorList,
+      schemeAddColorSearch: '',
+    });
+  },
+  onSchemeAddColorClose() {
+    this.setData({ schemeAddColorVisible: false });
+  },
+  onSchemeAddColorBack() {
+    this.setData({
+      schemeAddColorVisible: false,
+      schemeAddBrandVisible: true,
+    });
+  },
+  onSchemeAddColorSearch(e) {
+    const key = (e.detail.value || '').trim().toLowerCase();
+    const all = this.data.schemeAddColorList || [];
+    const filtered = key
+      ? all.filter(p =>
+          (p.colorNo || '').toLowerCase().includes(key) ||
+          (p.nameCn || '').toLowerCase().includes(key) ||
+          (p.nameEn || '').toLowerCase().includes(key)
+        )
+      : all;
+    this.setData({ schemeAddColorSearch: e.detail.value, schemeAddColorListFiltered: filtered });
+  },
+
+  onSchemeAddColorTap(e) {
+    const { gid } = e.currentTarget.dataset;
+    const cur = this.data.activeScheme;
+    if (!cur) return;
+    if (cur.pigmentsList.length >= this._SCHEME_PIGMENT_MAX) {
+      this.showToast(`每方案最多 ${this._SCHEME_PIGMENT_MAX} 个颜料`);
+      return;
+    }
+    if ((cur.pigments || []).indexOf(gid) !== -1) {
+      this.showToast('已添加，请勿重复');
+      return;
+    }
+    const id = this.data.activeSchemeId;
+    const schemes = this.data.schemes.map(s => {
+      if (s.id !== id) return s;
+      return {
+        ...s,
+        pigments: (s.pigments || []).concat([gid]),
+        updatedAt: Date.now(),
+      };
+    });
+    // 同步更新 schemeAddColorList 中该项的 added 状态
+    const colorList = (this.data.schemeAddColorList || []).map(p =>
+      p._gid === gid ? { ...p, added: true } : p
+    );
+    const colorListFiltered = (this.data.schemeAddColorListFiltered || []).map(p =>
+      p._gid === gid ? { ...p, added: true } : p
+    );
+    this.setData({
+      schemes,
+      schemeAddColorList: colorList,
+      schemeAddColorListFiltered: colorListFiltered,
+    }, () => {
+      this._saveSchemes();
+      this._refreshActiveScheme();
+      this.showToast('已添加');
+    });
+  },
+
+  // 删除颜料
+  onSchemeRemovePigment(e) {
+    const { gid } = e.currentTarget.dataset;
+    const id = this.data.activeSchemeId;
+    const schemes = this.data.schemes.map(s => {
+      if (s.id !== id) return s;
+      return {
+        ...s,
+        pigments: (s.pigments || []).filter(g => g !== gid),
+        updatedAt: Date.now(),
+      };
+    });
+    this.setData({ schemes }, () => {
+      this._saveSchemes();
+      this._refreshActiveScheme();
+    });
+  },
+
+  // 删除方案（长按 chip 触发，或编辑面板入口）
+  onSchemeDeleteCurrent() {
+    const cur = this.data.activeScheme;
+    if (!cur) return;
+    wx.showModal({
+      title: '删除方案',
+      content: `确定删除「${cur.name}」？删除后无法恢复`,
+      confirmColor: '#FF4D4F',
+      success: (res) => {
+        if (!res.confirm) return;
+        const id = this.data.activeSchemeId;
+        const schemes = this.data.schemes.filter(s => s.id !== id);
+        const nextActive = schemes.length > 0 ? schemes[0].id : 0;
+        this.setData({ schemes, activeSchemeId: nextActive }, () => {
+          this._saveSchemes();
+          this._refreshActiveScheme();
+          this.showToast('已删除');
+        });
+      },
+    });
+  },
 });
