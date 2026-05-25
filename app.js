@@ -2,9 +2,32 @@
 const _now = () => Date.now();
 console.log('[app] script loaded', _now());
 
+const STORAGE_KEY = 'wc_user_states_v1';
+
 App({
   onLaunch() {
     console.log('[app] onLaunch', _now());
+    // 启动时预热：从本地存储读取用户标记状态，按品牌算出 owned/wishlist 计数
+    // 写入 globalData，让品牌列表页第一帧就能拿到正确的拥有数（无需等颜料数据加载）
+    if (!this.globalData.ownedCounts) this.globalData.ownedCounts = {};
+    if (!this.globalData.wishlistCounts) this.globalData.wishlistCounts = {};
+    try {
+      const states = wx.getStorageSync(STORAGE_KEY) || {};
+      Object.keys(states).forEach(brandId => {
+        const brandStates = states[brandId] || {};
+        let owned = 0, wish = 0;
+        Object.keys(brandStates).forEach(pigmentId => {
+          const s = brandStates[pigmentId];
+          if (s.owned) owned++;
+          if (s.wishlist) wish++;
+        });
+        this.globalData.ownedCounts[brandId] = owned;
+        this.globalData.wishlistCounts[brandId] = wish;
+      });
+      console.log('[app] 已恢复用户标记统计', this.globalData.ownedCounts);
+    } catch (err) {
+      console.error('[app] 读取本地状态失败', err);
+    }
   },
   onShow() {
     console.log('[app] onShow', _now());
@@ -16,6 +39,8 @@ App({
     console.error('[app] onPageNotFound', _now(), res);
   },
   globalData: {
-    userId: 'demo'
+    userId: 'demo',
+    ownedCounts: {},
+    wishlistCounts: {},
   }
 });

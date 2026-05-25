@@ -156,27 +156,36 @@
           <view wx:if="{{item.swatch}}" class="lib-swatch" style="background: {{item.swatch}}"></view>
           <view wx:else class="lib-swatch lib-swatch-empty">—</view>
         </view>
-        <view class="lib-status">
-          <view wx:if="{{item.owned}}" class="status-dot owned">
-            <text class="status-icon">✓</text>
-          </view>
-          <view wx:elif="{{item.wishlist}}" class="status-dot wishlist">
-            <text class="status-icon">★</text>
-          </view>
+      </view>
+
+      <!-- 空态：筛选无命中 -->
+      <view class="empty-filter-wrap" wx:if="{{libRendered.length === 0 && !libLoading && libIsFilterEmpty}}">
+        <view class="empty-filter-icon">
+          <text class="empty-filter-icon-glyph">⌕</text>
+        </view>
+        <view class="empty-filter-title">没有命中的颜料</view>
+        <view class="empty-filter-desc">{{libEmptyDesc}}</view>
+        <view class="empty-filter-chips" wx:if="{{libActiveFilters.length > 0}}">
           <view
-            wx:else
-            class="status-dot unowned dashed"
-            data-gid="{{item._gid}}"
-            catchtap="onLibQuickWishlist"
-            hover-class="unowned-hover"
-            hover-stay-time="80"
+            class="empty-filter-chip"
+            wx:for="{{libActiveFilters}}"
+            wx:key="key"
+            data-key="{{item.key}}"
+            bindtap="onLibRemoveChip"
+            hover-class="filter-chip-hover"
           >
-            <text class="status-icon">+</text>
+            <text class="empty-filter-chip-prefix">清除</text>
+            <text class="empty-filter-chip-label">{{item.label}}</text>
+            <text class="empty-filter-chip-x">×</text>
           </view>
+        </view>
+        <view class="empty-filter-btn" bindtap="onLibClearAllFilters" hover-class="empty-filter-btn-hover">
+          清除全部筛选
         </view>
       </view>
 
-      <view class="empty-wrap" wx:if="{{libRendered.length === 0 && !libLoading}}">
+      <!-- 空态：子Tab本身无数据（非筛选导致） -->
+      <view class="empty-wrap" wx:elif="{{libRendered.length === 0 && !libLoading}}">
         <view class="empty-icon">📂</view>
         <view class="empty-text">{{libEmptyText}}</view>
       </view>
@@ -362,6 +371,96 @@
       <view class="sort-option" data-sort="markedAt" bindtap="onLibSortChange">
         <text class="sort-option-label">按加入时间（最新在前）</text>
         <view class="radio {{libSortType === 'markedAt' ? 'checked' : ''}}"></view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 颜料详情抽屉 V4（色彩库行点击拉起，与品牌详情页同款） -->
+  <view class="mask {{drawerVisible ? 'show' : ''}}" bindtap="closeDrawer">
+    <view class="drawer {{drawerVisible ? 'show' : ''}}" catchtap="noop">
+      <view class="drawer-handle"></view>
+
+      <!-- 头部：品牌 ICON + 颜料中文名/英文名/色号 chip -->
+      <view class="drawer-header">
+        <view class="drawer-brand-icon" style="background: {{drawerBrand.color}};">
+          <text class="drawer-brand-abbr">{{drawerBrand.iconText}}</text>
+          <text class="drawer-brand-cn">{{drawerBrand.nameCn}}</text>
+        </view>
+        <view class="drawer-meta">
+          <view class="drawer-title-row">
+            <text class="drawer-title">{{drawerPigment.nameCn}}</text>
+            <view wx:if="{{drawerPigment.owned}}" class="drawer-badge owned">
+              <text class="drawer-badge-icon">✓</text>
+            </view>
+          </view>
+          <view class="drawer-en">{{drawerPigment.nameEn}}</view>
+          <view class="drawer-chip-wrap">
+            <text class="drawer-chip">{{drawerPigment.colorNo}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 色料 + 透明度 双栏 -->
+      <view class="drawer-info-row">
+        <view class="info-card info-card-half">
+          <view class="info-label">色料</view>
+          <view class="info-value mono">{{drawerPigment.pigment || '—'}}</view>
+        </view>
+        <view class="info-card info-card-half transparency-card">
+          <view class="info-label">透明度</view>
+          <view class="transparency-row">
+            <view class="transparency-text">
+              <view class="transparency-cn">{{drawerTransCn}}</view>
+              <view class="transparency-en">{{drawerPigment.transparency || '—'}}</view>
+            </view>
+            <view class="transparency-dot" style="background: {{drawerTransDot}};"></view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 色卡条 -->
+      <view class="info-card swatch-card">
+        <view class="info-label">色卡</view>
+        <view wx:if="{{drawerPigment.swatch}}" class="swatch-bar" style="background: {{drawerPigment.swatch}};"></view>
+        <view wx:else class="swatch-bar swatch-bar-empty">无色卡</view>
+      </view>
+
+      <!-- 双行动按钮 -->
+      <view class="drawer-actions">
+        <view
+          wx:if="{{drawerPigment.owned}}"
+          class="drawer-action-btn wishlist disabled"
+        >
+          <text class="drawer-action-icon">★</text>
+          <text class="drawer-action-text">加入心愿单</text>
+        </view>
+        <view
+          wx:elif="{{drawerPigment.wishlist}}"
+          class="drawer-action-btn wishlist active"
+          bindtap="onDrawerToggleWishlist"
+          hover-class="action-btn-hover"
+        >
+          <text class="drawer-action-icon">★</text>
+          <text class="drawer-action-text">已加入心愿单</text>
+        </view>
+        <view
+          wx:else
+          class="drawer-action-btn wishlist"
+          bindtap="onDrawerToggleWishlist"
+          hover-class="action-btn-hover"
+        >
+          <text class="drawer-action-icon">★</text>
+          <text class="drawer-action-text">加入心愿单</text>
+        </view>
+
+        <view
+          class="drawer-action-btn owned-btn {{drawerPigment.owned ? 'secondary' : 'primary'}}"
+          bindtap="onDrawerToggleOwned"
+          hover-class="action-btn-hover"
+        >
+          <text class="drawer-action-icon">{{drawerPigment.owned ? '−' : '+'}}</text>
+          <text class="drawer-action-text">{{drawerPigment.owned ? '取消拥有' : '标记为已拥有'}}</text>
+        </view>
       </view>
     </view>
   </view>

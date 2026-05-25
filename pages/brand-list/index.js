@@ -45,6 +45,8 @@ Page({
     libRendered: [],
     libFilteredTotal: 0,
     libEmptyText: '暂无颜料',
+    libIsFilterEmpty: false,
+    libEmptyDesc: '',
 
     libSortType: 'colorNo',
     libSortLabel: '按色号',
@@ -72,6 +74,13 @@ Page({
     libTransOptions: [],
 
     brandsMeta: [],
+
+    // ===== 颜料详情抽屉（V4，跨品牌复用） =====
+    drawerVisible: false,
+    drawerPigment: null,
+    drawerBrand: { color: '#888', iconText: '?', nameCn: '' },
+    drawerTransCn: '',
+    drawerTransDot: '#CCCCCC',
 
     toastVisible: false,
     toastText: '',
@@ -141,31 +150,31 @@ Page({
 
   // ============ 色彩库 ============
   _enterLibrary() {
-    if (!this._allPigments) {
-      this.setData({ libLoading: true });
-      pigmentStore.getAllPigmentsAsync().then(all => {
-        const brandsMeta = dataStore.getBrandsMeta();
-        const brandMap = {};
-        brandsMeta.forEach(b => { brandMap[b.id] = b; });
-        all.forEach(p => {
-          const b = brandMap[p.brandId];
-          p._brandColor = b ? b.color : '#888';
-          p._brandAbbr = b ? b.iconText : '';
-          p._brandCn = b ? b.nameCn : '';
-        });
-        this._allPigments = all;
-        this._buildLibraryFilterOptions();
-        this.setData({
-          libLoading: false,
-          brandsMeta,
-        }, () => this._applyLibraryFilterAndSort());
-      }).catch(err => {
-        console.error('色彩库加载失败', err);
-        this.setData({ libLoading: false });
+    // 即使已有 _allPigments 缓存，也必须重新从 pigment-store 读取最新数据，
+    // 避免「全部品牌 → 详情页改心愿单 → 切到色彩库」时显示旧数据。
+    // pigment-store 内部有 require 缓存，重建 _allPigments 开销很低。
+    const isFirstLoad = !this._allPigments;
+    if (isFirstLoad) this.setData({ libLoading: true });
+    pigmentStore.getAllPigmentsAsync().then(all => {
+      const brandsMeta = dataStore.getBrandsMeta();
+      const brandMap = {};
+      brandsMeta.forEach(b => { brandMap[b.id] = b; });
+      all.forEach(p => {
+        const b = brandMap[p.brandId];
+        p._brandColor = b ? b.color : '#888';
+        p._brandAbbr = b ? b.iconText : '';
+        p._brandCn = b ? b.nameCn : '';
       });
-    } else {
-      this._applyLibraryFilterAndSort();
-    }
+      this._allPigments = all;
+      this._buildLibraryFilterOptions();
+      this.setData({
+        libLoading: false,
+        brandsMeta,
+      }, () => this._applyLibraryFilterAndSort());
+    }).catch(err => {
+      console.error('色彩库加载失败', err);
+      this.setData({ libLoading: false });
+    });
   },
 
   _reloadLibraryDataIfNeeded() {
@@ -273,16 +282,44 @@ Page({
 
     this._libFilteredFull = list;
     this._libRenderedCount = 0;
+    const subLabelMap = { owned: '已拥有', wishlist: '心愿单', unowned: '未拥有' };
     const emptyMap = { owned: '还没有已拥有的颜料', wishlist: '还没有加入心愿单的颜料', unowned: '没有未拥有的颜料' };
+    const hasFilter = !!(libFilterBrand || libFilterPigment || libFilterTrans);
+    // 区分：筛选无命中 vs 子Tab本身就没数据
+    const libIsFilterEmpty = list.length === 0 && hasFilter;
+    let libEmptyDesc = '';
+    if (libIsFilterEmpty) {
+      const conds = [];
+      if (libFilterBrand) {
+        const b = (this.data.brandsMeta || []).find(x => x.id === libFilterBrand);
+        if (b) conds.push(b.nameCn);
+      }
+      if (libFilterPigment) conds.push(libFilterPigment);
+      if (libFilterTrans) {
+        const cn = (TRANSPARENCY_COLOR[libFilterTrans] || {}).cn || libFilterTrans;
+        conds.push(cn);
+      }
+      libEmptyDesc = `在「${subLabelMap[librarySubTab] || ''}」中没有匹配 ${conds.join(' · ')} 的颜料`;
+    }
     this.setData({
       libFilteredTotal: list.length,
       libEmptyText: emptyMap[librarySubTab] || '暂无颜料',
+      libIsFilterEmpty,
+      libEmptyDesc,
+      // 关键：先清空 libRendered，避免 list.length === 0 时 _libAppendNextPage 短路 return
+      // 导致 libRendered 保留旧数据使空态判断失效
+      libRendered: [],
     }, () => this._libAppendNextPage());
     this._updateLibActiveFilters();
   },
 
   _libAppendNextPage() {
     const all = this._libFilteredFull || [];
+    if (all.length === 0) {
+      // 没有任何数据时确保渲染列表也是空的（已在上游 setData，但兜底一次）
+      this._libRenderedCount = 0;
+      return;
+    }
     const next = Math.min((this._libRenderedCount || 0) + this._LIB_PAGE_SIZE, all.length);
     if (next === (this._libRenderedCount || 0)) return;
     this._libRenderedCount = next;
@@ -305,52 +342,116 @@ Page({
     this.setData({ libActiveFilters: arr, activeFilterCount: arr.length });
   },
 
-  // 行点击 → 跳转所属品牌详情页
+  // 行点击 → 在当前页拉起颜料详情抽屉（V4，与品牌详情页同款）
   onLibRowTap(e) {
     const { gid } = e.currentTarget.dataset;
     const item = (this._allPigments || []).find(p => p._gid === gid);
-    if (item) {
-      wx.navigateTo({ url: `/pages/brand-detail/index?id=${item.brandId}` });
-    }
-  },
-
-  // 一键加入心愿单
-  onLibQuickWishlist(e) {
-    const { gid } = e.currentTarget.dataset;
-    const item = (this._allPigments || []).find(p => p._gid === gid);
-    if (!item || item.owned) return;
-    pigmentStore.getPigmentsAsync(item.brandId).then(list => {
-      const updated = list.map(p =>
-        p.id === item.id ? { ...p, wishlist: !p.wishlist } : p
-      );
-      pigmentStore.savePigments(item.brandId, updated);
-      const newWish = !item.wishlist;
-      this._allPigments.forEach(p => {
-        if (p._gid === gid) {
-          p.wishlist = newWish;
-          p.markedAt = newWish ? Date.now() : p.markedAt;
-        }
-      });
-      const stat = dataStore.getGlobalStat();
-      this.setData({ stat });
-      this._applyLibraryFilterAndSort();
-      this.showToast(newWish ? '已加入心愿单' : '已移出心愿单');
+    if (!item) return;
+    const brandsMeta = this.data.brandsMeta || [];
+    const brand = brandsMeta.find(b => b.id === item.brandId) || { color: '#888', iconText: '?', nameCn: '' };
+    const trans = TRANSPARENCY_COLOR[item.transparency] || { dot: '#CCCCCC', cn: item.transparency || '—' };
+    this.setData({
+      drawerVisible: true,
+      drawerPigment: { ...item },
+      drawerBrand: brand,
+      drawerTransCn: trans.cn,
+      drawerTransDot: trans.dot,
     });
   },
 
+  closeDrawer() { this.setData({ drawerVisible: false }); },
+
+  // 抽屉中切换「已拥有」
+  onDrawerToggleOwned() {
+    const cur = this.data.drawerPigment;
+    if (!cur) return;
+    const nextOwned = !cur.owned;
+    pigmentStore.getPigmentsAsync(cur.brandId).then(list => {
+      const updated = list.map(p =>
+        p.id === cur.id
+          ? { ...p, owned: nextOwned, wishlist: nextOwned ? false : p.wishlist }
+          : p
+      );
+      pigmentStore.savePigments(cur.brandId, updated);
+      // 同步更新内存全量数据
+      this._allPigments.forEach(p => {
+        if (p._gid === cur._gid) {
+          p.owned = nextOwned;
+          if (nextOwned) {
+            p.wishlist = false;
+            p.markedAt = Date.now();
+          }
+        }
+      });
+      const newPigment = { ...cur, owned: nextOwned, wishlist: nextOwned ? false : cur.wishlist };
+      const stat = dataStore.getGlobalStat();
+      this.setData({ stat, drawerPigment: newPigment });
+      this._applyLibraryFilterAndSort();
+      this.showToast(nextOwned ? '已添加到拥有' : '已取消拥有');
+    });
+  },
+
+  // 抽屉中切换「心愿单」
+  onDrawerToggleWishlist() {
+    const cur = this.data.drawerPigment;
+    if (!cur || cur.owned) return;
+    const nextWish = !cur.wishlist;
+    pigmentStore.getPigmentsAsync(cur.brandId).then(list => {
+      const updated = list.map(p =>
+        p.id === cur.id ? { ...p, wishlist: nextWish } : p
+      );
+      pigmentStore.savePigments(cur.brandId, updated);
+      this._allPigments.forEach(p => {
+        if (p._gid === cur._gid) {
+          p.wishlist = nextWish;
+          if (nextWish) p.markedAt = Date.now();
+        }
+      });
+      const newPigment = { ...cur, wishlist: nextWish };
+      const stat = dataStore.getGlobalStat();
+      this.setData({ stat, drawerPigment: newPigment });
+      this._applyLibraryFilterAndSort();
+      this.showToast(nextWish ? '已加入心愿单' : '已移出心愿单');
+    });
+  },
+
+  // 一键加入心愿单（已废弃：状态点列已移除，所有状态切换统一在 V4 抽屉中操作）
+  // onLibQuickWishlist 处理器已删除
+
   // ===== 筛选弹层 =====
   onLibFilterTap() { this.setData({ libFilterMainVisible: true }); },
-  onLibFilterMainClose() { this.setData({ libFilterMainVisible: false }); },
+  onLibFilterMainClose() {
+    // 关闭主筛选弹层时同步刷新一次列表，避免任何中间态导致筛选未应用
+    this.setData({ libFilterMainVisible: false }, () => this._applyLibraryFilterAndSort());
+  },
 
   onLibOpenBrandFilter() {
     this.setData({ libBrandPanelVisible: true, libBrandTemp: this.data.libFilterBrand });
   },
   onLibBrandPanelClose() { this.setData({ libBrandPanelVisible: false }); },
+  // 点击品牌选项即时应用：写入 libFilterBrand + 关闭品牌面板&主筛选弹层 + 立即重排
   onLibBrandOptionTap(e) {
     const id = Number(e.currentTarget.dataset.id);
-    this.setData({ libBrandTemp: this.data.libBrandTemp === id ? 0 : id });
+    const nextId = this.data.libFilterBrand === id ? 0 : id;
+    const b = (this.data.brandsMeta || []).find(x => x.id === nextId);
+    this.setData({
+      libBrandTemp: nextId,
+      libFilterBrand: nextId,
+      libFilterBrandCn: b ? b.nameCn : '',
+      libBrandPanelVisible: false,
+      libFilterMainVisible: false,
+    }, () => this._applyLibraryFilterAndSort());
   },
-  onLibBrandClear() { this.setData({ libBrandTemp: 0 }); },
+  // 「全部品牌」入口：清除并即时应用
+  onLibBrandClear() {
+    this.setData({
+      libBrandTemp: 0,
+      libFilterBrand: 0,
+      libFilterBrandCn: '',
+      libBrandPanelVisible: false,
+      libFilterMainVisible: false,
+    }, () => this._applyLibraryFilterAndSort());
+  },
   onLibBrandConfirm() {
     const id = this.data.libBrandTemp;
     const b = (this.data.brandsMeta || []).find(x => x.id === id);
@@ -358,7 +459,8 @@ Page({
       libFilterBrand: id,
       libFilterBrandCn: b ? b.nameCn : '',
       libBrandPanelVisible: false,
-    });
+      libFilterMainVisible: false,
+    }, () => this._applyLibraryFilterAndSort());
   },
 
   onLibOpenPigmentFilter() {
@@ -375,28 +477,70 @@ Page({
     const list = this.data.libPigmentOptions.filter(o => o.code.toUpperCase().includes(key));
     this.setData({ libPigmentSearchKey: e.detail.value, libPigmentOptionsFiltered: list });
   },
+  // 点击色料选项即时应用：写入 libFilterPigment + 关闭色料面板&主筛选弹层 + 立即重排
   onLibPigmentOptionTap(e) {
     const { code } = e.currentTarget.dataset;
-    this.setData({ libPigmentTemp: code === this.data.libPigmentTemp ? '' : code });
+    const nextCode = code === this.data.libFilterPigment ? '' : code;
+    this.setData({
+      libPigmentTemp: nextCode,
+      libFilterPigment: nextCode,
+      libPigmentPanelVisible: false,
+      libFilterMainVisible: false,
+    }, () => this._applyLibraryFilterAndSort());
   },
-  onLibPigmentClear() { this.setData({ libPigmentTemp: '' }); },
+  // 「全部色料」入口：清除并即时应用
+  onLibPigmentClear() {
+    this.setData({
+      libPigmentTemp: '',
+      libFilterPigment: '',
+      libPigmentPanelVisible: false,
+      libFilterMainVisible: false,
+    }, () => this._applyLibraryFilterAndSort());
+  },
   onLibPigmentConfirm() {
-    this.setData({ libFilterPigment: this.data.libPigmentTemp, libPigmentPanelVisible: false });
+    this.setData({
+      libFilterPigment: this.data.libPigmentTemp,
+      libPigmentPanelVisible: false,
+      libFilterMainVisible: false,
+    }, () => this._applyLibraryFilterAndSort());
   },
 
   onLibOpenTransFilter() {
     this.setData({ libTransPanelVisible: true, libTransTemp: this.data.libFilterTrans });
   },
   onLibTransPanelClose() { this.setData({ libTransPanelVisible: false }); },
+  // 点击透明度选项即时应用：写入 libFilterTrans + 关闭透明度面板&主筛选弹层 + 立即重排
   onLibTransOptionTap(e) {
     const { value } = e.currentTarget.dataset;
-    this.setData({ libTransTemp: this.data.libTransTemp === value ? '' : value });
+    const nextValue = this.data.libFilterTrans === value ? '' : value;
+    const cn = nextValue ? ((TRANSPARENCY_COLOR[nextValue] || {}).cn || nextValue) : '未选';
+    this.setData({
+      libTransTemp: nextValue,
+      libFilterTrans: nextValue,
+      libFilterTransLabel: cn,
+      libTransPanelVisible: false,
+      libFilterMainVisible: false,
+    }, () => this._applyLibraryFilterAndSort());
   },
-  onLibTransClear() { this.setData({ libTransTemp: '' }); },
+  // 「全部透明度」入口：清除并即时应用
+  onLibTransClear() {
+    this.setData({
+      libTransTemp: '',
+      libFilterTrans: '',
+      libFilterTransLabel: '未选',
+      libTransPanelVisible: false,
+      libFilterMainVisible: false,
+    }, () => this._applyLibraryFilterAndSort());
+  },
   onLibTransConfirm() {
     const v = this.data.libTransTemp;
     const cn = v ? ((TRANSPARENCY_COLOR[v] || {}).cn || v) : '未选';
-    this.setData({ libFilterTrans: v, libFilterTransLabel: cn, libTransPanelVisible: false });
+    this.setData({
+      libFilterTrans: v,
+      libFilterTransLabel: cn,
+      libTransPanelVisible: false,
+      libFilterMainVisible: false,
+    }, () => this._applyLibraryFilterAndSort());
   },
 
   onLibFilterReset() {
@@ -407,6 +551,16 @@ Page({
       libFilterTrans: '',
       libFilterTransLabel: '未选',
       libFilterMainVisible: false,
+    }, () => this._applyLibraryFilterAndSort());
+  },
+  // 空态-清除全部筛选（不关闭弹层场景，与上面共用 reset 逻辑）
+  onLibClearAllFilters() {
+    this.setData({
+      libFilterBrand: 0,
+      libFilterBrandCn: '',
+      libFilterPigment: '',
+      libFilterTrans: '',
+      libFilterTransLabel: '未选',
     }, () => this._applyLibraryFilterAndSort());
   },
   onLibFilterApply() {

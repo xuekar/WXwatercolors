@@ -1,5 +1,6 @@
 // utils/pigment-store.js — 颜料数据中心
 // 通过 setTimeout 把 require + map 拆到 onLoad 之外的下一帧
+// 用户的 owned / wishlist / markedAt 状态持久化到 wx.storage，跨编译/升级保留
 
 const PIGMENT_LOADERS = {
   1: () => require('./data/wn-pigments.js'),
@@ -10,6 +11,81 @@ const PIGMENT_LOADERS = {
   6: () => require('./data/mg-pigments.js'),
 };
 
+// ============ 持久化存储 ============
+// storage 结构：{ [brandId]: { [pigmentId]: { owned, wishlist, markedAt } } }
+// 只存"用户主动标记"的颜料（owned 或 wishlist 至少一个为 true），节省空间
+// 带版本号便于未来迁移
+const STORAGE_KEY = 'wc_user_states_v1';
+
+let _userStates = null;  // 内存中的用户状态副本（首次访问时从 storage 读取）
+
+function _loadStatesFromStorage() {
+  if (_userStates) return _userStates;
+  try {
+    const raw = wx.getStorageSync(STORAGE_KEY);
+    _userStates = (raw && typeof raw === 'object') ? raw : {};
+  } catch (err) {
+    console.error('[pigment-store] 读取本地状态失败', err);
+    _userStates = {};
+  }
+  return _userStates;
+}
+
+function _saveStatesToStorage() {
+  if (!_userStates) return;
+  try {
+    wx.setStorageSync(STORAGE_KEY, _userStates);
+  } catch (err) {
+    console.error('[pigment-store] 写入本地状态失败', err);
+  }
+}
+
+// 把整个品牌的最新数据回写到 _userStates，并落盘
+function _persistBrandStates(brandId, list) {
+  const states = _loadStatesFromStorage();
+  const brandStates = {};
+  list.forEach(p => {
+    if (p.owned || p.wishlist) {
+      brandStates[p.id] = {
+        owned: !!p.owned,
+        wishlist: !!p.wishlist,
+        markedAt: p.markedAt || 0,
+      };
+    }
+    // 既不 owned 也不 wishlist 的不存（节省空间，等同于"已删除"）
+  });
+  if (Object.keys(brandStates).length > 0) {
+    states[brandId] = brandStates;
+  } else {
+    delete states[brandId];
+  }
+  _saveStatesToStorage();
+}
+
+// 把 storage 中的用户状态合并到原始 list（仅 owned/wishlist/markedAt 三字段）
+function _mergeUserStates(brandId, list) {
+  const states = _loadStatesFromStorage();
+  const brandStates = states[brandId] || {};
+  return list.map(p => {
+    const s = brandStates[p.id];
+    if (s) {
+      return {
+        ...p,
+        owned: !!s.owned,
+        wishlist: !!s.wishlist,
+        markedAt: s.markedAt || 0,
+      };
+    }
+    return {
+      ...p,
+      owned: !!p.owned,
+      wishlist: !!p.wishlist,
+      markedAt: p.markedAt || 0,
+    };
+  });
+}
+
+// ============ 内存缓存 ============
 const _pigmentsCache = {};
 
 function _syncCounts(brandId, list) {
@@ -34,11 +110,10 @@ function _loadAsync(brandId) {
         if (!_pigmentsCache[brandId]) {
           const loader = PIGMENT_LOADERS[brandId];
           const src = loader ? loader() : [];
-          _pigmentsCache[brandId] = src.map(p => ({
-            ...p,
-            wishlist: !!p.wishlist,
-            markedAt: p.markedAt || 0,
-          }));
+          // 关键：从原始数据出发，合并 storage 中的用户标记
+          _pigmentsCache[brandId] = _mergeUserStates(brandId, src);
+          // 同步一次统计数到 globalData（页面初次进来时品牌列表能立即拿到正确数字）
+          _syncCounts(brandId, _pigmentsCache[brandId]);
         }
         resolve(_pigmentsCache[brandId].map(p => ({ ...p })));
       } catch (err) {
@@ -66,7 +141,6 @@ module.exports = {
   },
 
   // 跨品牌聚合所有颜料（每条带 brandId、_gid）
-  // 调用方式：pigmentStore.getAllPigmentsAsync().then(all => ...)
   getAllPigmentsAsync() {
     return _loadAllAsync();
   },
@@ -101,5 +175,24 @@ module.exports = {
       };
     });
     _syncCounts(id, _pigmentsCache[id]);
+    // 持久化到 wx.storage
+    _persistBrandStates(id, _pigmentsCache[id]);
+  },
+
+  // 调试用：清空所有用户标记状态
+  clearAllUserStates() {
+    _userStates = {};
+    try {
+      wx.removeStorageSync(STORAGE_KEY);
+    } catch (err) {
+      console.error('[pigment-store] 清空状态失败', err);
+    }
+    // 同时清空内存缓存，强制下次重新加载
+    Object.keys(_pigmentsCache).forEach(k => delete _pigmentsCache[k]);
+    const app = getApp();
+    if (app && app.globalData) {
+      app.globalData.ownedCounts = {};
+      app.globalData.wishlistCounts = {};
+    }
   },
 };
