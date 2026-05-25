@@ -1064,24 +1064,39 @@ Page({
     });
   },
 
-  // 调用 msgSecCheck 云函数
-  // 注意：未部署云函数时本地放行（仅做长度/字符基础校验），便于开发联调
-  // 生产环境请部署云函数 wxSecCheck 并改为真实调用
+  // 调用 msgSecCheck 云函数进行内容安全检测
+  // 优先调云函数 wxSecCheck，未开通云开发时降级到本地正则过滤（开发联调可用）
+  // resolve(true) 表示通过；resolve(false) 表示违规；reject(err) 表示接口异常
   _msgSecCheck(content) {
-    return new Promise((resolve, reject) => {
-      // 基础前置过滤
-      if (/[<>&"'\\\/]/.test(content)) {
-        return resolve(false);
+    // 基础前置过滤（特殊字符/转义）
+    if (/[<>&"'\\\/]/.test(content)) {
+      return Promise.resolve(false);
+    }
+    const app = getApp();
+    const cloudReady = app && app.globalData && app.globalData.cloudInited && wx.cloud;
+    if (!cloudReady) {
+      // 未开通云开发：本地降级，仅做基础过滤
+      console.warn('[msgSecCheck] 云开发未初始化，本地降级放行');
+      return Promise.resolve(true);
+    }
+    return wx.cloud.callFunction({
+      name: 'wxSecCheck',
+      data: { content, scene: 2 },
+    }).then((res) => {
+      const r = res && res.result;
+      console.log('[msgSecCheck] 云函数返回', r);
+      if (!r) return false;
+      // errcode 0 通过；87014 命中违规；其他视为接口异常
+      if (r.errcode === 0) {
+        // version 2 时 detail.suggest 需为 pass
+        if (r.detail && r.detail.suggest && r.detail.suggest !== 'pass') {
+          return false;
+        }
+        return true;
       }
-      // TODO：接入云函数后改为真实调用
-      // wx.cloud.callFunction({
-      //   name: 'wxSecCheck',
-      //   data: { content, scene: 1 },
-      //   success: (res) => resolve(res.result && res.result.errcode === 0),
-      //   fail: reject,
-      // });
-      // 暂时模拟：500ms 后通过
-      setTimeout(() => resolve(true), 500);
+      if (r.errcode === 87014) return false;
+      // 其他错误（云函数未部署/网络异常）抛出，让调用方走「检测失败」提示
+      throw new Error(r.errmsg || `errcode ${r.errcode}`);
     });
   },
 

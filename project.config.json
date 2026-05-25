@@ -50,6 +50,7 @@
   "libVersion": "3.0.0",
   "appid": "wx7329b68155aa5161",
   "projectname": "watercolor-miniprogram",
+  "cloudfunctionRoot": "cloudfunctions/",
   "condition": {},
   "editorSetting": {
     "tabIndent": "insertSpaces",
