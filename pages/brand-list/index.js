@@ -127,7 +127,18 @@ Page({
     schemeRenameChecking: false,
   },
 
-  onLoad() {
+  onLoad(options) {
+    // 分享路径携带的 tab 参数
+    if (options && options.tab && ['all', 'library', 'lottery', 'scheme'].indexOf(options.tab) !== -1) {
+      this.setData({ activeTab: options.tab });
+    }
+    // 启用右上角胶囊「转发」「分享到朋友圈」入口
+    if (wx.showShareMenu) {
+      wx.showShareMenu({
+        withShareTicket: true,
+        menus: ['shareAppMessage', 'shareTimeline'],
+      });
+    }
     // 加载今日签配置
     try {
       const cfg = wx.getStorageSync('wc_lottery_config_v1');
@@ -1472,5 +1483,59 @@ Page({
         });
       },
     });
+  },
+
+  // ============ 分享给好友 / 朋友圈 ============
+  // 根据当前 activeTab 给不同文案
+  _buildShareConfig() {
+    const tab = this.data.activeTab;
+    if (tab === 'lottery') {
+      const drawn = this.data.lotteryDrawn || [];
+      if (drawn.length > 0) {
+        const names = drawn.slice(0, 3).map(p => p.nameCn).join('·');
+        return {
+          title: `今日抽到了 ${drawn.length} 色：${names}`,
+          path: '/pages/brand-list/index?tab=lottery',
+        };
+      }
+      return { title: '抽一签今日水彩配色', path: '/pages/brand-list/index?tab=lottery' };
+    }
+    if (tab === 'scheme') {
+      const cur = this.data.activeScheme;
+      if (cur && cur.pigmentsList && cur.pigmentsList.length > 0) {
+        return {
+          title: `我的配色方案「${cur.name}」共 ${cur.pigmentsList.length} 色`,
+          path: '/pages/brand-list/index?tab=scheme',
+        };
+      }
+      return { title: '一起来搭配水彩颜色', path: '/pages/brand-list/index?tab=scheme' };
+    }
+    if (tab === 'library') {
+      const stat = this.data.stat || {};
+      return {
+        title: `我已收藏 ${stat.ownedCount || 0} 色水彩颜料`,
+        path: '/pages/brand-list/index?tab=library',
+      };
+    }
+    return {
+      title: '水彩色号管理 · 6 大品牌真实数据',
+      path: '/pages/brand-list/index',
+    };
+  },
+
+  onShareAppMessage() {
+    const cfg = this._buildShareConfig();
+    return {
+      title: cfg.title,
+      path: cfg.path,
+    };
+  },
+
+  onShareTimeline() {
+    const cfg = this._buildShareConfig();
+    return {
+      title: cfg.title,
+      query: cfg.path.indexOf('?') >= 0 ? cfg.path.split('?')[1] : '',
+    };
   },
 });

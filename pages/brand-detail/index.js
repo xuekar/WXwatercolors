@@ -106,6 +106,13 @@ Page({
     this._brandId = id;
     const brand = dataStore.getBrand(id) || { nameCn: '未知品牌', nameEn: '', iconText: '?', color: '#888' };
     wx.setNavigationBarTitle({ title: brand.nameCn });
+    // 启用右上角胶囊「转发」「分享到朋友圈」入口
+    if (wx.showShareMenu) {
+      wx.showShareMenu({
+        withShareTicket: true,
+        menus: ['shareAppMessage', 'shareTimeline'],
+      });
+    }
     console.log('[detail] onLoad after setNavTitle', T());
 
     // 第一帧：仅头部 + loading
@@ -484,4 +491,25 @@ Page({
     }, 1600);
   },
   noop() {},
+
+  // ============ 分享 ============
+  onShareAppMessage() {
+    const brand = this.data.brand || {};
+    const name = brand.nameCn || '水彩品牌';
+    const total = this.data.pigmentTotal || 0;
+    return {
+      title: total > 0 ? `${name} · 共 ${total} 色` : name,
+      path: `/pages/brand-detail/index?id=${this.data.brandId}`,
+    };
+  },
+
+  onShareTimeline() {
+    const brand = this.data.brand || {};
+    const name = brand.nameCn || '水彩品牌';
+    const total = this.data.pigmentTotal || 0;
+    return {
+      title: total > 0 ? `${name} · 共 ${total} 色` : name,
+      query: `id=${this.data.brandId}`,
+    };
+  },
 });
