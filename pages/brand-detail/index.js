@@ -74,6 +74,11 @@ Page({
     ownedCount: 0,
     checkedCount: 0,
     allSelected: false,
+    // ==== 对比模式（V5 新增） ====
+    compareMode: false,
+    compareCount: 0,
+    compareList: [],          // [{ _gid, colorNo, nameCn, swatch, _brandAbbr }]
+    compareCartVisible: false,
     toastVisible: false,
     toastText: '',
     drawerVisible: false,
@@ -106,6 +111,13 @@ Page({
     this._brandId = id;
     const brand = dataStore.getBrand(id) || { nameCn: '未知品牌', nameEn: '', iconText: '?', color: '#888' };
     wx.setNavigationBarTitle({ title: brand.nameCn });
+    // 启用右上角胶囊「转发」「分享到朋友圈」入口
+    if (wx.showShareMenu) {
+      wx.showShareMenu({
+        withShareTicket: true,
+        menus: ['shareAppMessage', 'shareTimeline'],
+      });
+    }
     console.log('[detail] onLoad after setNavTitle', T());
 
     // 第一帧：仅头部 + loading
@@ -175,7 +187,10 @@ Page({
     const prev = this._renderedCount || 0;
     this._renderedCount = next;
     console.log('[detail] _appendNextPage', prev, '→', next, '/', all.length, Date.now());
-    this.setData({ filteredPigments: all.slice(0, next), filteredTotal: all.length });
+    // 注入对比模式选中标记
+    const set = this._compareSet || new Set();
+    const slice = all.slice(0, next).map(p => set.has(p.id) ? { ...p, _compareSelected: true } : p);
+    this.setData({ filteredPigments: slice, filteredTotal: all.length });
   },
 
   // 触底加载下一页
@@ -376,6 +391,8 @@ Page({
   // ==== 标注模式 ====
   onMarkTap() {
     if (!this._pigments) return;
+    // 标注 / 对比 互斥：进标注前退出对比
+    if (this.data.compareMode) this._exitCompareMode();
     this._pigments = this._pigments.map(p => ({ ...p, checked: p.owned }));
     this.setData({ markMode: true }, () => {
       this.applyFilterAndSort();
@@ -400,6 +417,11 @@ Page({
   },
   onRowTap(e) {
     const { id } = e.currentTarget.dataset;
+    if (this.data.compareMode) {
+      // 对比模式：toggle 加入/移除购物车
+      this._toggleCompare(id);
+      return;
+    }
     if (this.data.markMode) {
       this._pigments = this._pigments.map(p =>
         p.id === id ? { ...p, checked: !p.checked } : p
@@ -484,4 +506,164 @@ Page({
     }, 1600);
   },
   noop() {},
+
+  // ============ 对比模式（V5 新增） ============
+  // 进入对比模式
+  onCompareTap() {
+    if (!this._pigments) return;
+    // 标注 / 对比 互斥：进对比前退出标注
+    if (this.data.markMode) {
+      this._pigments = this._pigments.map(p => ({ ...p, checked: p.owned }));
+      this.setData({ markMode: false });
+    }
+    this._compareSet = new Set();
+    this.setData({
+      compareMode: true,
+      compareCount: 0,
+      compareList: [],
+      compareCartVisible: false,
+    }, () => {
+      this.applyFilterAndSort();
+    });
+  },
+
+  // 退出对比模式（保留 setData 让 wxml 立即响应）
+  _exitCompareMode() {
+    this._compareSet = null;
+    this.setData({
+      compareMode: false,
+      compareCount: 0,
+      compareList: [],
+      compareCartVisible: false,
+    }, () => {
+      this.applyFilterAndSort();
+    });
+  },
+
+  onCancelCompare() {
+    this._exitCompareMode();
+  },
+
+  // 清空购物车（不退出对比模式）
+  onClearCompare() {
+    this._compareSet = new Set();
+    this.setData({
+      compareCount: 0,
+      compareList: [],
+      compareCartVisible: false,
+    }, () => {
+      this.applyFilterAndSort();
+    });
+  },
+
+  // 行点击：toggle 加入/移除购物车
+  _toggleCompare(id) {
+    if (!this._compareSet) this._compareSet = new Set();
+    const set = this._compareSet;
+    const pigment = this._pigments.find(p => p.id === id);
+    if (!pigment) return;
+    if (set.has(id)) {
+      set.delete(id);
+    } else {
+      set.add(id);
+    }
+    // 重新构建 compareList（按加入顺序：用 set 的 iteration order）
+    const brand = this.data.brand || {};
+    const abbr = brand.iconText || 'DS';
+    const list = [];
+    set.forEach(pid => {
+      const p = this._pigments.find(x => x.id === pid);
+      if (p) {
+        list.push({
+          _gid: `${this.data.brandId}_${p.id}`,
+          id: p.id,
+          colorNo: p.colorNo,
+          nameCn: p.nameCn,
+          nameEn: p.nameEn,
+          pigment: p.pigment,
+          transparency: p.transparency,
+          swatch: p.swatch,
+          _brandAbbr: abbr,
+          _brandCn: brand.nameCn,
+          _brandColor: brand.color,
+          _brandId: this.data.brandId,
+        });
+      }
+    });
+    this.setData({
+      compareCount: list.length,
+      compareList: list,
+    }, () => {
+      this.applyFilterAndSort();
+    });
+  },
+
+  // 横条左侧（购物车区域）点击 → 拉起清单
+  onCompareCartTap() {
+    if (this.data.compareCount === 0) {
+      this.showToast('购物车为空');
+      return;
+    }
+    this.setData({ compareCartVisible: true });
+  },
+
+  onCompareCartClose() {
+    this.setData({ compareCartVisible: false });
+  },
+
+  // 清单中移除单个
+  onCompareCartRemove(e) {
+    const { gid } = e.currentTarget.dataset;
+    const item = (this.data.compareList || []).find(x => x._gid === gid);
+    if (!item) return;
+    this._toggleCompare(item.id);
+  },
+
+  // 横条「确定」/ 清单「确定」→ 跳转对比页
+  onCompareConfirm() {
+    const list = this.data.compareList || [];
+    if (list.length === 0) {
+      this.showToast('请先加入颜料');
+      return;
+    }
+    // 通过 EventChannel 把数据传给对比页
+    wx.navigateTo({
+      url: '/pages/pigment-compare/index',
+      success: (res) => {
+        res.eventChannel.emit('initCompare', { items: list });
+        // 完成对比后清空购物车（用户期望：一次性流程）
+        this._exitCompareMode();
+      },
+      fail: (err) => {
+        console.error('[compare] navigateTo fail', err);
+        this.showToast('打开对比页失败');
+      },
+    });
+  },
+
+  // 离开页面时自动清空（生命周期 onUnload 调用）
+  _resetCompareOnLeave() {
+    this._compareSet = null;
+  },
+
+  // ============ 分享 ============
+  onShareAppMessage() {
+    const brand = this.data.brand || {};
+    const name = brand.nameCn || '水彩品牌';
+    const total = this.data.pigmentTotal || 0;
+    return {
+      title: total > 0 ? `${name} · 共 ${total} 色` : name,
+      path: `/pages/brand-detail/index?id=${this.data.brandId}`,
+    };
+  },
+
+  onShareTimeline() {
+    const brand = this.data.brand || {};
+    const name = brand.nameCn || '水彩品牌';
+    const total = this.data.pigmentTotal || 0;
+    return {
+      title: total > 0 ? `${name} · 共 ${total} 色` : name,
+      query: `id=${this.data.brandId}`,
+    };
+  },
 });

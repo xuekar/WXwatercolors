@@ -19,7 +19,7 @@
 
   <!-- 操作栏 -->
   <view class="action-bar">
-    <block wx:if="{{!markMode}}">
+    <block wx:if="{{!markMode && !compareMode}}">
       <view class="action-btn {{activeFilterCount > 0 ? 'active' : ''}}" bindtap="onFilterTap" hover-class="action-hover">
         <text class="action-icon">⌒</text>
         <text class="action-text">筛选</text>
@@ -32,12 +32,17 @@
         <text class="action-sub">{{sortLabel}}</text>
       </view>
       <view class="action-divider"></view>
+      <view class="action-btn" bindtap="onCompareTap" hover-class="action-hover">
+        <text class="action-icon">⇄</text>
+        <text class="action-text">对比</text>
+      </view>
+      <view class="action-divider"></view>
       <view class="action-btn primary" bindtap="onMarkTap" hover-class="action-hover">
         <text class="action-icon icon-edit">✎</text>
         <text class="action-text">标注</text>
       </view>
     </block>
-    <block wx:else>
+    <block wx:elif="{{markMode}}">
       <view class="action-btn" bindtap="onCancelMark" hover-class="action-hover">
         <text class="action-icon">✕</text>
         <text class="action-text">取消</text>
@@ -48,6 +53,23 @@
         <text class="action-text">{{allSelected ? '全不选' : '全选'}}</text>
       </view>
     </block>
+    <block wx:else>
+      <view class="action-btn" bindtap="onCancelCompare" hover-class="action-hover">
+        <text class="action-icon">✕</text>
+        <text class="action-text">退出对比</text>
+      </view>
+      <view class="action-divider"></view>
+      <view class="action-btn primary" bindtap="onClearCompare" hover-class="action-hover">
+        <text class="action-icon">⌫</text>
+        <text class="action-text">清空（{{compareCount}}）</text>
+      </view>
+    </block>
+  </view>
+
+  <!-- 对比模式提示条 -->
+  <view wx:if="{{compareMode}}" class="compare-tip-bar">
+    <text class="compare-tip-icon">⇄</text>
+    <text class="compare-tip-text">点击颜料加入对比</text>
   </view>
 
   <!-- 已应用筛选条件 chip 区 -->
@@ -70,8 +92,7 @@
   <!-- 表头 -->
   <view class="table-header">
     <view class="col-no">色号</view>
-    <view class="col-en">英文名</view>
-    <view class="col-cn">中文名</view>
+    <view class="col-name">名称</view>
     <view class="col-swatch">色卡</view>
     <view class="col-status">{{markMode ? '标注' : '拥有'}}</view>
   </view>
@@ -83,10 +104,10 @@
     class="pigment-scroll"
     bindscrolltolower="onListScrollToLower"
     lower-threshold="200"
-    style="padding-bottom: {{markMode ? '180rpx' : '0'}};"
+    style="padding-bottom: {{markMode ? '180rpx' : (compareMode ? '180rpx' : '0')}};"
   >
     <view
-      class="pigment-row"
+      class="pigment-row {{compareMode && item._compareSelected ? 'compare-selected' : ''}}"
       wx:for="{{filteredPigments}}"
       wx:key="id"
       data-id="{{item.id}}"
@@ -96,20 +117,24 @@
     >
       <view class="col-no">
         <view class="col-no-text">{{item.colorNo}}</view>
-        <view class="col-no-sub" wx:if="{{item.transparency}}">{{item.transparency}}</view>
       </view>
-      <view class="col-en">
-        <view class="col-en-main">{{item.nameEn}}</view>
-        <view class="col-en-sub" wx:if="{{item.pigment}}">{{item.pigment}}</view>
+      <view class="col-name">
+        <view class="col-name-cn">{{item.nameCn}}</view>
+        <view class="col-name-en" wx:if="{{item.nameEn}}">{{item.nameEn}}</view>
       </view>
-      <view class="col-cn">{{item.nameCn}}</view>
       <view class="col-swatch">
         <view wx:if="{{item.swatch}}" class="swatch" style="background: {{item.swatch}}"></view>
         <view wx:else class="swatch swatch-empty">—</view>
       </view>
       <view class="col-status">
+        <!-- 对比模式：实心 ✓ / 空心 + -->
+        <block wx:if="{{compareMode}}">
+          <view class="brand-status {{item._compareSelected ? 'owned' : 'unowned dashed'}}">
+            <text class="status-icon">{{item._compareSelected ? '✓' : '+'}}</text>
+          </view>
+        </block>
         <!-- 普通模式：拥有状态 ICON -->
-        <block wx:if="{{!markMode}}">
+        <block wx:elif="{{!markMode}}">
           <!-- 已拥有：显示蓝色对勾 -->
           <view wx:if="{{item.owned}}" class="brand-status owned">
             <text class="status-icon">✓</text>
@@ -385,6 +410,72 @@
       <view class="filter-actions">
         <view class="filter-btn secondary" bindtap="onTransparencyClear" hover-class="filter-btn-hover">清除</view>
         <view class="filter-btn primary" bindtap="onTransparencyConfirm" hover-class="filter-btn-hover">确定</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 对比模式吸底横条 -->
+  <view wx:if="{{compareMode}}" class="compare-bar">
+    <view class="compare-bar-left" bindtap="onCompareCartTap" hover-class="compare-bar-left-hover">
+      <view class="compare-cart">
+        <view class="compare-cart-grid">
+          <view class="compare-cart-cell"></view>
+          <view class="compare-cart-cell"></view>
+          <view class="compare-cart-cell"></view>
+          <view class="compare-cart-cell"></view>
+        </view>
+        <view wx:if="{{compareCount > 0}}" class="compare-cart-badge">{{compareCount > 99 ? '99+' : compareCount}}</view>
+      </view>
+      <view class="compare-bar-text">
+        <view class="compare-bar-title">已选 {{compareCount}} 个颜料</view>
+        <view class="compare-bar-sub">点击查看清单 ›</view>
+      </view>
+    </view>
+    <view
+      class="compare-bar-confirm {{compareCount > 0 ? '' : 'disabled'}}"
+      catchtap="onCompareConfirm"
+      hover-class="{{compareCount > 0 ? 'compare-bar-confirm-hover' : ''}}"
+    >
+      <text>确定 →</text>
+    </view>
+  </view>
+
+  <!-- 对比购物车清单 popup -->
+  <view class="mask {{compareCartVisible ? 'show' : ''}}" bindtap="onCompareCartClose">
+    <view class="filter-panel {{compareCartVisible ? 'show' : ''}}" catchtap="noop">
+      <view class="filter-handle"></view>
+      <view class="compare-cart-title">已选颜料清单</view>
+      <view class="compare-cart-subtitle">共 {{compareCount}} 个 · 选好后点击确定进入对比</view>
+
+      <scroll-view scroll-y class="compare-cart-list">
+        <view
+          class="compare-cart-row"
+          wx:for="{{compareList}}"
+          wx:key="_gid"
+        >
+          <view class="compare-cart-brand">{{item._brandAbbr || 'DS'}}</view>
+          <view class="compare-cart-mid">
+            <view class="compare-cart-no">{{item.colorNo}}</view>
+            <view class="compare-cart-cn">{{item.nameCn}}</view>
+          </view>
+          <view class="compare-cart-swatch" style="background: {{item.swatch || '#FAFAFA'}}"></view>
+          <view
+            class="compare-cart-remove"
+            data-gid="{{item._gid}}"
+            catchtap="onCompareCartRemove"
+            hover-class="compare-cart-remove-hover"
+          >×</view>
+        </view>
+        <view wx:if="{{compareList.length === 0}}" class="compare-cart-empty">购物车为空</view>
+      </scroll-view>
+
+      <view class="filter-actions">
+        <view class="filter-btn secondary" bindtap="onClearCompare" hover-class="filter-btn-hover">清空</view>
+        <view
+          class="filter-btn primary {{compareCount > 0 ? '' : 'disabled'}}"
+          bindtap="onCompareConfirm"
+          hover-class="filter-btn-hover"
+        >确定（{{compareCount}}）→ 对比</view>
       </view>
     </view>
   </view>

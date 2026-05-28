@@ -1,0 +1,42 @@
+<view class="compare-page">
+  <view wx:if="{{total === 0}}" class="empty-wrap">
+    <view class="empty-icon">📂</view>
+    <view class="empty-text">没有要对比的颜料</view>
+  </view>
+
+  <view wx:else class="compare-grid">
+    <view
+      class="compare-card"
+      wx:for="{{items}}"
+      wx:key="_gid"
+      data-gid="{{item._gid}}"
+      bindtap="onCardTap"
+      hover-class="compare-card-hover"
+    >
+      <!-- 色卡 -->
+      <view class="compare-card-swatch-wrap">
+        <view
+          wx:if="{{item.swatch}}"
+          class="compare-card-swatch"
+          style="background: {{item.swatch}}"
+        ></view>
+        <view wx:else class="compare-card-swatch swatch-empty">—</view>
+      </view>
+      <!-- 品牌缩写 + 色号 -->
+      <view class="compare-card-no-row">
+        <text wx:if="{{item._brandAbbr}}" class="compare-card-brand-badge">{{item._brandAbbr}}</text>
+        <text class="compare-card-no">{{item.colorNo}}</text>
+      </view>
+      <!-- 中文名（主信息） -->
+      <view class="compare-card-cn">{{item.nameCn}}</view>
+      <!-- 英文名 -->
+      <view class="compare-card-en">{{item.nameEn || ' '}}</view>
+      <!-- 色料 -->
+      <view class="compare-card-pigment">{{item.pigment || '—'}}</view>
+      <!-- 透明度 -->
+      <view class="compare-card-transparency">{{item.transparency || '—'}}</view>
+    </view>
+  </view>
+
+  <view wx:if="{{total > 0}}" class="compare-footer">— 共 {{total}} 个颜料 —</view>
+</view>
