@@ -601,7 +601,7 @@ Page({
   // 横条左侧（购物车区域）点击 → 拉起清单
   onCompareCartTap() {
     if (this.data.compareCount === 0) {
-      this.showToast('购物车为空');
+      this.showToast('对比颜料为空');
       return;
     }
     this.setData({ compareCartVisible: true });

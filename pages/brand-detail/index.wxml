@@ -466,7 +466,7 @@
             hover-class="compare-cart-remove-hover"
           >×</view>
         </view>
-        <view wx:if="{{compareList.length === 0}}" class="compare-cart-empty">购物车为空</view>
+        <view wx:if="{{compareList.length === 0}}" class="compare-cart-empty">对比颜料为空</view>
       </scroll-view>
 
       <view class="filter-actions">

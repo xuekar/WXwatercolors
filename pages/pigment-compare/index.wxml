@@ -40,3 +40,11 @@
 
   <view wx:if="{{total > 0}}" class="compare-footer">— 共 {{total}} 个颜料 —</view>
 </view>
+
+<!-- 色卡大图抽屉 -->
+<view class="swatch-drawer-mask {{swatchDrawerVisible ? 'show' : ''}}" bindtap="onSwatchDrawerClose">
+  <view class="swatch-drawer-panel {{swatchDrawerVisible ? 'show' : ''}}" catchtap="">
+    <view class="swatch-drawer-handle"></view>
+    <view class="swatch-drawer-color" style="background: {{swatchDrawerColor}}"></view>
+  </view>
+</view>
