@@ -125,6 +125,12 @@ Page({
     schemeRenameVisible: false,
     schemeRenameInput: '',
     schemeRenameChecking: false,
+
+    // ===== 色彩库对比模式（V6 新增） =====
+    libCompareMode: false,
+    libCompareCount: 0,
+    libCompareList: [],
+    libCompareCartVisible: false,
   },
 
   onLoad(options) {
@@ -415,6 +421,11 @@ Page({
   // 行点击 → 在当前页拉起颜料详情抽屉（V4，与品牌详情页同款）
   onLibRowTap(e) {
     const { gid } = e.currentTarget.dataset;
+    // 对比模式下：toggle 加入/移除
+    if (this.data.libCompareMode) {
+      this._libToggleCompare(gid);
+      return;
+    }
     const item = (this._allPigments || []).find(p => p._gid === gid);
     if (!item) return;
     const brandsMeta = this.data.brandsMeta || [];
@@ -487,6 +498,113 @@ Page({
 
   // 一键加入心愿单（已废弃：状态点列已移除，所有状态切换统一在 V4 抽屉中操作）
   // onLibQuickWishlist 处理器已删除
+
+  // ===== 色彩库对比模式（V6 新增） =====
+  onLibCompareTap() {
+    this._libCompareSet = new Set();
+    this.setData({
+      libCompareMode: true,
+      libCompareCount: 0,
+      libCompareList: [],
+      libCompareCartVisible: false,
+    });
+  },
+
+  onLibCancelCompare() {
+    this._libCompareSet = null;
+    this.setData({
+      libCompareMode: false,
+      libCompareCount: 0,
+      libCompareList: [],
+      libCompareCartVisible: false,
+    });
+  },
+
+  onLibClearCompare() {
+    this._libCompareSet = new Set();
+    this.setData({
+      libCompareCount: 0,
+      libCompareList: [],
+      libCompareCartVisible: false,
+    });
+  },
+
+  // 行点击：对比模式下 toggle 加入/移除
+  _libToggleCompare(gid) {
+    if (!this._libCompareSet) this._libCompareSet = new Set();
+    const set = this._libCompareSet;
+    if (set.has(gid)) {
+      set.delete(gid);
+    } else {
+      set.add(gid);
+    }
+    const brandsMeta = this.data.brandsMeta || [];
+    const list = [];
+    set.forEach(id => {
+      const p = (this._allPigments || []).find(x => x._gid === id);
+      if (p) {
+        const brand = brandsMeta.find(b => b.id === p.brandId) || { color: '#888', iconText: '?', nameCn: '' };
+        list.push({
+          _gid: p._gid,
+          colorNo: p.colorNo,
+          nameCn: p.nameCn,
+          nameEn: p.nameEn,
+          pigment: p.pigment,
+          transparency: p.transparency,
+          swatch: p.swatch,
+          _brandAbbr: brand.iconText,
+          _brandCn: brand.nameCn,
+          _brandColor: brand.color,
+          _brandId: p.brandId,
+        });
+      }
+    });
+    // 更新 libRendered 中的 _compareSelected 标记
+    const rendered = this.data.libRendered.map(p => ({
+      ...p,
+      _compareSelected: set.has(p._gid),
+    }));
+    this.setData({
+      libCompareCount: list.length,
+      libCompareList: list,
+      libRendered: rendered,
+    });
+  },
+
+  onLibCompareCartTap() {
+    if (this.data.libCompareCount === 0) {
+      this.showToast('对比颜料为空');
+      return;
+    }
+    this.setData({ libCompareCartVisible: true });
+  },
+
+  onLibCompareCartClose() {
+    this.setData({ libCompareCartVisible: false });
+  },
+
+  onLibCompareCartRemove(e) {
+    const { gid } = e.currentTarget.dataset;
+    this._libToggleCompare(gid);
+  },
+
+  onLibCompareConfirm() {
+    const list = this.data.libCompareList || [];
+    if (list.length === 0) {
+      this.showToast('请先加入颜料');
+      return;
+    }
+    wx.navigateTo({
+      url: '/pages/pigment-compare/index',
+      success: (res) => {
+        res.eventChannel.emit('initCompare', { items: list });
+        this.onLibCancelCompare();
+      },
+      fail: () => {
+        this.showToast('打开对比页失败');
+      },
+    });
+  },
 
   // ===== 筛选弹层 =====
   onLibFilterTap() { this.setData({ libFilterMainVisible: true }); },
