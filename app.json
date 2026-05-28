@@ -1,7 +1,8 @@
 {
   "pages": [
     "pages/brand-list/index",
-    "pages/brand-detail/index"
+    "pages/brand-detail/index",
+    "pages/pigment-compare/index"
   ],
   "lazyCodeLoading": "requiredComponents",
   "window": {
