@@ -1800,41 +1800,20 @@ Page({
   },
 
   // ============ 分享给好友 / 朋友圈 ============
-  // 根据当前 activeTab 给不同文案
+  // 统一文案「锻造你的色彩世界」，path 按当前 tab 区分
   _buildShareConfig() {
     const tab = this.data.activeTab;
+    const TITLE = '锻造你的色彩世界';
     if (tab === 'lottery') {
-      const drawn = this.data.lotteryDrawn || [];
-      if (drawn.length > 0) {
-        const names = drawn.slice(0, 3).map(p => p.nameCn).join('·');
-        return {
-          title: `今日抽到了 ${drawn.length} 色：${names}`,
-          path: '/pages/brand-list/index?tab=lottery',
-        };
-      }
-      return { title: '抽一签今日水彩配色', path: '/pages/brand-list/index?tab=lottery' };
+      return { title: TITLE, path: '/pages/brand-list/index?tab=lottery' };
     }
     if (tab === 'scheme') {
-      const cur = this.data.activeScheme;
-      if (cur && cur.pigmentsList && cur.pigmentsList.length > 0) {
-        return {
-          title: `我的配色方案「${cur.name}」共 ${cur.pigmentsList.length} 色`,
-          path: '/pages/brand-list/index?tab=scheme',
-        };
-      }
-      return { title: '一起来搭配水彩颜色', path: '/pages/brand-list/index?tab=scheme' };
+      return { title: TITLE, path: '/pages/brand-list/index?tab=scheme' };
     }
     if (tab === 'library') {
-      const stat = this.data.stat || {};
-      return {
-        title: `我已收藏 ${stat.ownedCount || 0} 色水彩颜料`,
-        path: '/pages/brand-list/index?tab=library',
-      };
+      return { title: TITLE, path: '/pages/brand-list/index?tab=library' };
     }
-    return {
-      title: '水彩色号管理 · 6 大品牌真实数据',
-      path: '/pages/brand-list/index',
-    };
+    return { title: TITLE, path: '/pages/brand-list/index' };
   },
 
   onShareAppMessage() {

@@ -583,6 +583,7 @@ Page({
           pigment: p.pigment,
           transparency: p.transparency,
           swatch: p.swatch,
+          swatchImage: p.swatchImage || '',
           _brandAbbr: abbr,
           _brandCn: brand.nameCn,
           _brandColor: brand.color,
@@ -648,21 +649,15 @@ Page({
 
   // ============ 分享 ============
   onShareAppMessage() {
-    const brand = this.data.brand || {};
-    const name = brand.nameCn || '水彩品牌';
-    const total = this.data.pigmentTotal || 0;
     return {
-      title: total > 0 ? `${name} · 共 ${total} 色` : name,
+      title: '锻造你的色彩世界',
       path: `/pages/brand-detail/index?id=${this.data.brandId}`,
     };
   },
 
   onShareTimeline() {
-    const brand = this.data.brand || {};
-    const name = brand.nameCn || '水彩品牌';
-    const total = this.data.pigmentTotal || 0;
     return {
-      title: total > 0 ? `${name} · 共 ${total} 色` : name,
+      title: '锻造你的色彩世界',
       query: `id=${this.data.brandId}`,
     };
   },
