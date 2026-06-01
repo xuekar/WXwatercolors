@@ -1,0 +1,9 @@
+{
+  "name": "syncUserStates",
+  "version": "1.0.0",
+  "description": "用户颜料标记状态云端同步（owned/wishlist）",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}

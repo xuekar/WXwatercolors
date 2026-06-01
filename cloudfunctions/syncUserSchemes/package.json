@@ -1,0 +1,9 @@
+{
+  "name": "syncUserSchemes",
+  "version": "1.0.0",
+  "description": "用户色彩方案云端同步",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "~2.6.3"
+  }
+}
