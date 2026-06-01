@@ -885,9 +885,9 @@
           <view class="info-value mono">{{drawerPigment.pigment || '—'}}</view>
         </view>
         <view class="info-card info-card-half transparency-card">
-          <view class="info-label">透明度</view>
           <view class="transparency-row">
             <view class="transparency-text">
+              <view class="info-label">透明度</view>
               <view class="transparency-cn">{{drawerTransCn}}</view>
               <view class="transparency-en">{{drawerPigment.transparency || '—'}}</view>
             </view>

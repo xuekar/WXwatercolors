@@ -123,7 +123,8 @@
         <view class="col-name-en" wx:if="{{item.nameEn}}">{{item.nameEn}}</view>
       </view>
       <view class="col-swatch">
-        <view wx:if="{{item.swatch}}" class="swatch" style="background: {{item.swatch}}"></view>
+        <image wx:if="{{item.swatchImage}}" class="swatch swatch-img" src="{{item.swatchImage}}" mode="aspectFill" lazy-load></image>
+        <view wx:elif="{{item.swatch}}" class="swatch" style="background: {{item.swatch}}"></view>
         <view wx:else class="swatch swatch-empty">—</view>
       </view>
       <view class="col-status">
@@ -238,9 +239,9 @@
           <view class="info-value mono">{{drawerPigment.pigment || '—'}}</view>
         </view>
         <view class="info-card info-card-half transparency-card">
-          <view class="info-label">透明度</view>
           <view class="transparency-row">
             <view class="transparency-text">
+              <view class="info-label">透明度</view>
               <view class="transparency-cn">{{drawerTransCn}}</view>
               <view class="transparency-en">{{drawerPigment.transparency || '—'}}</view>
             </view>
@@ -252,7 +253,8 @@
       <!-- 色卡条（纯色彩，下移到色料/透明度下方） -->
       <view class="info-card swatch-card">
         <view class="info-label">色卡</view>
-        <view wx:if="{{drawerPigment.swatch}}" class="swatch-bar" style="background: {{drawerPigment.swatch}};"></view>
+        <image wx:if="{{drawerPigment.swatchImage}}" class="swatch-bar swatch-bar-img" src="{{drawerPigment.swatchImage}}" mode="aspectFill"></image>
+        <view wx:elif="{{drawerPigment.swatch}}" class="swatch-bar" style="background: {{drawerPigment.swatch}};"></view>
         <view wx:else class="swatch-bar swatch-bar-empty">无色卡</view>
       </view>
 
@@ -458,7 +460,8 @@
             <view class="compare-cart-no">{{item.colorNo}}</view>
             <view class="compare-cart-cn">{{item.nameCn}}</view>
           </view>
-          <view class="compare-cart-swatch" style="background: {{item.swatch || '#FAFAFA'}}"></view>
+          <image wx:if="{{item.swatchImage}}" class="compare-cart-swatch compare-cart-swatch-img" src="{{item.swatchImage}}" mode="aspectFill"></image>
+          <view wx:else class="compare-cart-swatch" style="background: {{item.swatch || '#FAFAFA'}}"></view>
           <view
             class="compare-cart-remove"
             data-gid="{{item._gid}}"
