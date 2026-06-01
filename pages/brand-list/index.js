@@ -86,7 +86,7 @@ Page({
     toastText: '',
 
     // ===== 今日签 =====
-    lotteryConfig: { dedupDays: 3, count: 3 },  // X 日不重复，Y 抽取数量
+    lotteryConfig: { dedupDays: 3, count: 3, sameBrand: false },  // X 日不重复，Y 抽取数量，是否同品牌
     lotteryConfigExpanded: false,  // 默认折叠紧凑条；点击「调整」展开
     lotteryConfigMiniText: '3 日内不重复 · 抽取 3 个 · 总 0 个',  // 紧凑条预拼接文字
     lotteryDrawn: [],          // 当前抽中的颜料列表（含 _brandColor/_brandAbbr/_brandCn）
@@ -149,7 +149,7 @@ Page({
     try {
       const cfg = wx.getStorageSync('wc_lottery_config_v1');
       if (cfg && typeof cfg === 'object') {
-        this.setData({ lotteryConfig: { dedupDays: cfg.dedupDays, count: cfg.count || 3 } });
+        this.setData({ lotteryConfig: { dedupDays: cfg.dedupDays, count: cfg.count || 3, sameBrand: !!cfg.sameBrand } });
       }
     } catch (e) {}
     this._updateLotteryMiniText();
@@ -976,6 +976,12 @@ Page({
     this.setData({ lotteryConfig: cfg }, () => this._updateLotteryMiniText());
     this._saveLotteryConfig();
   },
+  // 同品牌开关
+  onLotterySameBrandToggle() {
+    const cfg = { ...this.data.lotteryConfig, sameBrand: !this.data.lotteryConfig.sameBrand };
+    this.setData({ lotteryConfig: cfg }, () => this._updateLotteryMiniText());
+    this._saveLotteryConfig();
+  },
   _saveLotteryConfig() {
     try {
       wx.setStorageSync(this._LOTTERY_CONFIG_KEY, this.data.lotteryConfig);
@@ -989,6 +995,7 @@ Page({
     const owned = all.filter(p => p.owned);
     const Y = this.data.lotteryConfig.count || 3;
     const X = this.data.lotteryConfig.dedupDays;  // 0 或 null 表示不去重
+    const sameBrand = !!this.data.lotteryConfig.sameBrand;
 
     if (owned.length === 0) {
       this.showToast('请先标记已拥有的颜料');
@@ -1008,6 +1015,30 @@ Page({
         const t = lastDrawnMap[p._gid] || 0;
         return now - t > ms;
       });
+    }
+
+    // 同品牌过滤：随机选一个有候选的品牌，仅在该品牌内抽取
+    if (sameBrand && pool.length > 0) {
+      const byBrand = {};
+      pool.forEach(p => {
+        if (!byBrand[p.brandId]) byBrand[p.brandId] = [];
+        byBrand[p.brandId].push(p);
+      });
+      const brandIds = Object.keys(byBrand);
+      if (brandIds.length === 0) {
+        this.showToast('候选池为空');
+        return;
+      }
+      // 优先在能抽满 Y 个的品牌中随机选；如果都不够，则在拥有最多颜料的品牌中选
+      const enoughBrands = brandIds.filter(b => byBrand[b].length >= Y);
+      let pickedBrand;
+      if (enoughBrands.length > 0) {
+        pickedBrand = enoughBrands[Math.floor(Math.random() * enoughBrands.length)];
+      } else {
+        // 没有能抽满的品牌，随机选一个
+        pickedBrand = brandIds[Math.floor(Math.random() * brandIds.length)];
+      }
+      pool = byBrand[pickedBrand];
     }
 
     // 候选不足处理
