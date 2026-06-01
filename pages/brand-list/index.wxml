@@ -181,7 +181,8 @@
           <view class="lib-pigment-trans">{{item._metaSub}}</view>
         </view>
         <view wx:if="{{!libCompareMode}}" class="lib-swatch-wrap">
-          <view wx:if="{{item.swatch}}" class="lib-swatch" style="background: {{item.swatch}}"></view>
+          <image wx:if="{{item.swatchImage}}" class="lib-swatch lib-swatch-img" src="{{item.swatchImage}}" mode="aspectFill" lazy-load></image>
+          <view wx:elif="{{item.swatch}}" class="lib-swatch" style="background: {{item.swatch}}"></view>
           <view wx:else class="lib-swatch lib-swatch-empty">—</view>
         </view>
         <view wx:if="{{libCompareMode}}" class="lib-compare-check">
@@ -246,7 +247,7 @@
         <view wx:if="{{lotteryConfigExpanded}}" class="lottery-config">
           <view class="lottery-config-header">
             <text class="lottery-config-header-title">调整抽签条件</text>
-            <view class="lottery-config-collapse-btn" bindtap="onLotteryConfigToggle">收起 ▴</view>
+            <view class="lottery-config-collapse-btn" bindtap="onLotteryConfigToggle">保存 ▴</view>
           </view>
           <view class="lottery-config-row">
             <view class="lottery-config-label">
@@ -272,6 +273,17 @@
               <view class="lottery-stepper-btn" data-delta="1" bindtap="onLotteryCountChange">+</view>
             </view>
           </view>
+          <view class="lottery-config-divider"></view>
+          <!-- 同品牌开关 -->
+          <view class="lottery-config-row {{lotteryConfig.sameBrand ? 'lottery-config-row-active' : ''}}">
+            <view class="lottery-config-label">
+              <view class="lottery-config-main">同品牌</view>
+            </view>
+            <view class="lottery-switch {{lotteryConfig.sameBrand ? 'on' : ''}}" bindtap="onLotterySameBrandToggle">
+              <view class="lottery-switch-knob"></view>
+            </view>
+          </view>
+          <view class="lottery-config-tip">开启后本次抽签颜料将全部来自同一品牌（系统将随机选定一品牌后抽出）</view>
         </view>
 
         <!-- 抽取结果区（已抽签后） -->
@@ -873,9 +885,9 @@
           <view class="info-value mono">{{drawerPigment.pigment || '—'}}</view>
         </view>
         <view class="info-card info-card-half transparency-card">
-          <view class="info-label">透明度</view>
           <view class="transparency-row">
             <view class="transparency-text">
+              <view class="info-label">透明度</view>
               <view class="transparency-cn">{{drawerTransCn}}</view>
               <view class="transparency-en">{{drawerPigment.transparency || '—'}}</view>
             </view>
@@ -887,7 +899,8 @@
       <!-- 色卡条 -->
       <view class="info-card swatch-card">
         <view class="info-label">色卡</view>
-        <view wx:if="{{drawerPigment.swatch}}" class="swatch-bar" style="background: {{drawerPigment.swatch}};"></view>
+        <image wx:if="{{drawerPigment.swatchImage}}" class="swatch-bar swatch-bar-img" src="{{drawerPigment.swatchImage}}" mode="aspectFill"></image>
+        <view wx:elif="{{drawerPigment.swatch}}" class="swatch-bar" style="background: {{drawerPigment.swatch}};"></view>
         <view wx:else class="swatch-bar swatch-bar-empty">无色卡</view>
       </view>
 
@@ -967,7 +980,8 @@
             <view class="compare-cart-no">{{item.colorNo}}</view>
             <view class="compare-cart-cn">{{item.nameCn}}</view>
           </view>
-          <view class="compare-cart-swatch" style="background: {{item.swatch || '#FAFAFA'}}"></view>
+          <image wx:if="{{item.swatchImage}}" class="compare-cart-swatch compare-cart-swatch-img" src="{{item.swatchImage}}" mode="aspectFill"></image>
+          <view wx:else class="compare-cart-swatch" style="background: {{item.swatch || '#FAFAFA'}}"></view>
           <view
             class="compare-cart-remove"
             data-gid="{{item._gid}}"

@@ -4,6 +4,7 @@ Page({
     total: 0,
     swatchDrawerVisible: false,
     swatchDrawerColor: '',
+    swatchDrawerImage: '',
   },
 
   onLoad() {
@@ -29,10 +30,11 @@ Page({
   onCardTap(e) {
     const gid = e.currentTarget.dataset.gid;
     const item = this.data.items.find(i => i._gid === gid);
-    if (item && item.swatch) {
+    if (item && (item.swatch || item.swatchImage)) {
       this.setData({
         swatchDrawerVisible: true,
-        swatchDrawerColor: item.swatch,
+        swatchDrawerColor: item.swatch || '',
+        swatchDrawerImage: item.swatchImage || '',
       });
     }
   },
@@ -43,14 +45,14 @@ Page({
 
   onShareAppMessage() {
     return {
-      title: `${this.data.total} 个颜料对比`,
+      title: '锻造你的色彩世界',
       path: '/pages/brand-list/index',
     };
   },
 
   onShareTimeline() {
     return {
-      title: `${this.data.total} 个颜料对比`,
+      title: '锻造你的色彩世界',
       query: '',
     };
   },
