@@ -125,6 +125,12 @@ Page({
     schemeRenameVisible: false,
     schemeRenameInput: '',
     schemeRenameChecking: false,
+
+    // ===== 色彩库对比模式（V6 新增） =====
+    libCompareMode: false,
+    libCompareCount: 0,
+    libCompareList: [],
+    libCompareCartVisible: false,
   },
 
   onLoad(options) {
@@ -151,6 +157,33 @@ Page({
     this._loadSchemes();
     this._refreshLotterySchemeProgress();
     this.refresh();
+
+    // 监听云端用户状态同步完成事件（cloud pull 异步完成后页面需要刷新）
+    this._cloudSyncCheckTimer = setInterval(() => {
+      const app = getApp();
+      if (app && app.globalData && app.globalData.userStatesSyncedAt &&
+          app.globalData.userStatesSyncedAt !== this._lastUserStatesSyncedAt) {
+        this._lastUserStatesSyncedAt = app.globalData.userStatesSyncedAt;
+        console.log('[brand-list] 云端状态同步完成，刷新页面');
+        this._allPigments = null;
+        this.refresh();
+        if (this.data.activeTab === 'library') {
+          this._reloadLibraryDataIfNeeded();
+        } else if (this.data.activeTab === 'scheme') {
+          this._enterScheme();
+        }
+        // 同步完成后停止检查
+        clearInterval(this._cloudSyncCheckTimer);
+        this._cloudSyncCheckTimer = null;
+      }
+    }, 500);
+    // 10 秒后无论如何停止检查（避免泄漏）
+    setTimeout(() => {
+      if (this._cloudSyncCheckTimer) {
+        clearInterval(this._cloudSyncCheckTimer);
+        this._cloudSyncCheckTimer = null;
+      }
+    }, 10000);
   },
 
   onShow() {
@@ -165,6 +198,17 @@ Page({
       }
     } else {
       this._loaded = true;
+    }
+    // 检查云端用户状态是否已同步（首次进入或冷启动时云端拉取可能晚于 onLoad）
+    const app = getApp();
+    if (app && app.globalData && app.globalData.userStatesSyncedAt &&
+        app.globalData.userStatesSyncedAt !== this._lastUserStatesSyncedAt) {
+      this._lastUserStatesSyncedAt = app.globalData.userStatesSyncedAt;
+      console.log('[brand-list] 检测到云端状态已同步，刷新页面数据');
+      // 重新读取颜料数据（缓存已被云端拉取清空）
+      this.refresh();
+      this._allPigments = null;
+      if (this.data.activeTab === 'library') this._reloadLibraryDataIfNeeded();
     }
   },
 
@@ -415,6 +459,11 @@ Page({
   // 行点击 → 在当前页拉起颜料详情抽屉（V4，与品牌详情页同款）
   onLibRowTap(e) {
     const { gid } = e.currentTarget.dataset;
+    // 对比模式下：toggle 加入/移除
+    if (this.data.libCompareMode) {
+      this._libToggleCompare(gid);
+      return;
+    }
     const item = (this._allPigments || []).find(p => p._gid === gid);
     if (!item) return;
     const brandsMeta = this.data.brandsMeta || [];
@@ -487,6 +536,114 @@ Page({
 
   // 一键加入心愿单（已废弃：状态点列已移除，所有状态切换统一在 V4 抽屉中操作）
   // onLibQuickWishlist 处理器已删除
+
+  // ===== 色彩库对比模式（V6 新增） =====
+  onLibCompareTap() {
+    this._libCompareSet = new Set();
+    this.setData({
+      libCompareMode: true,
+      libCompareCount: 0,
+      libCompareList: [],
+      libCompareCartVisible: false,
+    });
+  },
+
+  onLibCancelCompare() {
+    this._libCompareSet = null;
+    this.setData({
+      libCompareMode: false,
+      libCompareCount: 0,
+      libCompareList: [],
+      libCompareCartVisible: false,
+    });
+  },
+
+  onLibClearCompare() {
+    this._libCompareSet = new Set();
+    this.setData({
+      libCompareCount: 0,
+      libCompareList: [],
+      libCompareCartVisible: false,
+    });
+  },
+
+  // 行点击：对比模式下 toggle 加入/移除
+  _libToggleCompare(gid) {
+    if (!this._libCompareSet) this._libCompareSet = new Set();
+    const set = this._libCompareSet;
+    if (set.has(gid)) {
+      set.delete(gid);
+    } else {
+      set.add(gid);
+    }
+    const brandsMeta = this.data.brandsMeta || [];
+    const list = [];
+    set.forEach(id => {
+      const p = (this._allPigments || []).find(x => x._gid === id);
+      if (p) {
+        const brand = brandsMeta.find(b => b.id === p.brandId) || { color: '#888', iconText: '?', nameCn: '' };
+        list.push({
+          _gid: p._gid,
+          colorNo: p.colorNo,
+          nameCn: p.nameCn,
+          nameEn: p.nameEn,
+          pigment: p.pigment,
+          transparency: p.transparency,
+          swatch: p.swatch,
+          swatchImage: p.swatchImage || '',
+          _brandAbbr: brand.iconText,
+          _brandCn: brand.nameCn,
+          _brandColor: brand.color,
+          _brandId: p.brandId,
+        });
+      }
+    });
+    // 更新 libRendered 中的 _compareSelected 标记
+    const rendered = this.data.libRendered.map(p => ({
+      ...p,
+      _compareSelected: set.has(p._gid),
+    }));
+    this.setData({
+      libCompareCount: list.length,
+      libCompareList: list,
+      libRendered: rendered,
+    });
+  },
+
+  onLibCompareCartTap() {
+    if (this.data.libCompareCount === 0) {
+      this.showToast('对比颜料为空');
+      return;
+    }
+    this.setData({ libCompareCartVisible: true });
+  },
+
+  onLibCompareCartClose() {
+    this.setData({ libCompareCartVisible: false });
+  },
+
+  onLibCompareCartRemove(e) {
+    const { gid } = e.currentTarget.dataset;
+    this._libToggleCompare(gid);
+  },
+
+  onLibCompareConfirm() {
+    const list = this.data.libCompareList || [];
+    if (list.length === 0) {
+      this.showToast('请先加入颜料');
+      return;
+    }
+    wx.navigateTo({
+      url: '/pages/pigment-compare/index',
+      success: (res) => {
+        res.eventChannel.emit('initCompare', { items: list });
+        this.onLibCancelCompare();
+      },
+      fail: () => {
+        this.showToast('打开对比页失败');
+      },
+    });
+  },
 
   // ===== 筛选弹层 =====
   onLibFilterTap() { this.setData({ libFilterMainVisible: true }); },
@@ -975,21 +1132,32 @@ Page({
       return;
     }
     this.setData({ lotterySaveChecking: true });
-    this._msgSecCheck(name).then(pass => {
-      if (!pass) {
+    this._msgSecCheck(name).then(result => {
+      if (result === 'risky') {
         this.setData({ lotterySaveChecking: false });
         this.showToast('名称含违规内容，请修改');
         return;
       }
-      this._persistLotteryAsScheme(name);
+      // 接口异常（error）则使用默认名 "方案X"，X=已保存方案数+1
+      let finalName = name;
+      let usedFallback = false;
+      if (result === 'error') {
+        const count = (this.data.schemes || []).length;
+        finalName = `方案${count + 1}`;
+        usedFallback = true;
+      }
+      this._persistLotteryAsScheme(finalName, usedFallback);
     }).catch(() => {
+      // 极端兜底
       this.setData({ lotterySaveChecking: false });
-      this.showToast('检测失败，请稍后重试');
+      const count = (this.data.schemes || []).length;
+      const finalName = `方案${count + 1}`;
+      this._persistLotteryAsScheme(finalName, true);
     });
   },
 
   // 把当前 lotteryDrawn 写入 schemes（与色彩方完全同结构）
-  _persistLotteryAsScheme(name) {
+  _persistLotteryAsScheme(name, usedFallback) {
     const drawn = this.data.lotteryDrawn || [];
     const gids = drawn.map(p => p._gid).filter(Boolean);
     const now = Date.now();
@@ -1008,10 +1176,10 @@ Page({
       lotterySaveChecking: false,
       lotterySaveDisabled: true,  // 本次抽取已保存，按钮置灰
     }, () => {
-      this._saveSchemes();
+      this._saveSchemes(true);
       this._refreshLotterySchemeProgress();
       this._saveLotteryCurrent({ saved: true });  // 同步落盘 saved 状态（跨编译保留置灰态）
-      this.showToast('已保存到色彩方');
+      this.showToast(usedFallback ? `检测异常，已使用默认名 ${name}` : '已保存到色彩方');
     });
   },
 
@@ -1059,6 +1227,7 @@ Page({
   _SCHEME_MAX_COUNT: 10,
   _SCHEME_PIGMENT_MAX: 48,
   _DEFAULT_SCHEME_NAMES: ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'],
+  _schemesPushTimer: null,
 
   _loadSchemes() {
     try {
@@ -1067,14 +1236,108 @@ Page({
     } catch (e) {
       this.setData({ schemes: [] });
     }
+    // 异步从云端拉取并合并（按 savedAt/createdAt 取较新版本）
+    this._pullSchemesFromCloud();
   },
 
-  _saveSchemes() {
+  _saveSchemes(immediate) {
     try {
       wx.setStorageSync(this._SCHEMES_KEY, this.data.schemes);
     } catch (e) {
       console.error('保存色彩方失败', e);
     }
+    // immediate=true 时立即推送（用于 saveScheme 等关键操作），否则 800ms 防抖
+    if (immediate) {
+      this._pushSchemesNow();
+    } else {
+      this._schedulePushSchemesToCloud();
+    }
+  },
+
+  // 立即推送到云端（不防抖，保证关键操作不丢失）
+  _pushSchemesNow() {
+    const app = getApp();
+    if (!app || !app.globalData || !app.globalData.cloudInited || !wx.cloud) return;
+    if (this._schemesPushTimer) {
+      clearTimeout(this._schemesPushTimer);
+      this._schemesPushTimer = null;
+    }
+    const schemes = this.data.schemes || [];
+    wx.cloud.callFunction({
+      name: 'syncUserSchemes',
+      data: { action: 'push', schemes },
+    }).then(res => {
+      const r = res && res.result;
+      if (r && r.success) {
+        console.log('[brand-list] 色彩方云端推送成功（立即）');
+      } else {
+        console.warn('[brand-list] 色彩方云端推送失败', r);
+      }
+    }).catch(err => {
+      console.warn('[brand-list] 色彩方云端推送异常', err);
+    });
+  },
+
+  // 启动时云端拉取（与本地按更新时间合并）
+  _pullSchemesFromCloud() {
+    const app = getApp();
+    if (!app || !app.globalData || !app.globalData.cloudInited || !wx.cloud) return;
+    wx.cloud.callFunction({
+      name: 'syncUserSchemes',
+      data: { action: 'pull' },
+    }).then(res => {
+      const r = res && res.result;
+      if (!(r && r.success)) {
+        console.warn('[brand-list] 色彩方云端拉取失败', r);
+        return;
+      }
+      const cloudSchemes = Array.isArray(r.schemes) ? r.schemes : [];
+      const localSchemes = this.data.schemes || [];
+      // 合并：以 id 为 key，保留 savedAt/createdAt 较大的版本
+      const mergedMap = {};
+      [...localSchemes, ...cloudSchemes].forEach(s => {
+        if (!s || !s.id) return;
+        const ts = s.savedAt || s.createdAt || 0;
+        if (!mergedMap[s.id] || ts > (mergedMap[s.id]._ts || 0)) {
+          mergedMap[s.id] = { ...s, _ts: ts };
+        }
+      });
+      const merged = Object.values(mergedMap)
+        .map(s => { const c = { ...s }; delete c._ts; return c; })
+        .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      // 写本地
+      try { wx.setStorageSync(this._SCHEMES_KEY, merged); } catch (e) {}
+      this.setData({ schemes: merged }, () => {
+        this._refreshActiveScheme && this._refreshActiveScheme();
+      });
+      console.log('[brand-list] 色彩方云端合并完成，共', merged.length, '个');
+    }).catch(err => {
+      console.warn('[brand-list] 色彩方云端拉取异常（已用本地）', err);
+    });
+  },
+
+  // 防抖式推送到云端
+  _schedulePushSchemesToCloud() {
+    const app = getApp();
+    if (!app || !app.globalData || !app.globalData.cloudInited || !wx.cloud) return;
+    if (this._schemesPushTimer) clearTimeout(this._schemesPushTimer);
+    this._schemesPushTimer = setTimeout(() => {
+      this._schemesPushTimer = null;
+      const schemes = this.data.schemes || [];
+      wx.cloud.callFunction({
+        name: 'syncUserSchemes',
+        data: { action: 'push', schemes },
+      }).then(res => {
+        const r = res && res.result;
+        if (r && r.success) {
+          console.log('[brand-list] 色彩方云端推送成功');
+        } else {
+          console.warn('[brand-list] 色彩方云端推送失败', r);
+        }
+      }).catch(err => {
+        console.warn('[brand-list] 色彩方云端推送异常', err);
+      });
+    }, 800);
   },
 
   _enterScheme() {
@@ -1175,7 +1438,7 @@ Page({
     };
     const newList = schemes.concat([newScheme]);
     this.setData({ schemes: newList, activeSchemeId: newScheme.id }, () => {
-      this._saveSchemes();
+      this._saveSchemes(true);
       this._refreshActiveScheme();
     });
   },
@@ -1189,7 +1452,7 @@ Page({
       s.id === id ? { ...s, savedAt: now, updatedAt: now } : s
     );
     this.setData({ schemes }, () => {
-      this._saveSchemes();
+      this._saveSchemes(true);
       this._refreshActiveScheme();
       this.showToast('已保存');
     });
@@ -1203,7 +1466,7 @@ Page({
       s.id === id ? { ...s, savedAt: null, updatedAt: Date.now() } : s
     );
     this.setData({ schemes }, () => {
-      this._saveSchemes();
+      this._saveSchemes(true);
       this._refreshActiveScheme();
     });
   },
@@ -1249,76 +1512,127 @@ Page({
     }
     if (this.data.schemeRenameChecking) return;
     this.setData({ schemeRenameChecking: true });
-    this._msgSecCheck(name).then(pass => {
-      if (!pass) {
+    this._msgSecCheck(name).then(result => {
+      if (result === 'risky') {
         this.setData({ schemeRenameChecking: false });
         this.showToast('名称含违规内容，请修改');
         return;
       }
+      // 接口异常（error）则使用默认名 "方案X"，X=已保存方案数+1
+      let finalName = name;
+      let usedFallback = false;
+      if (result === 'error') {
+        const count = (this.data.schemes || []).length;
+        finalName = `方案${count + 1}`;
+        usedFallback = true;
+      }
       // 保存
       const id = this.data.activeSchemeId;
       const schemes = this.data.schemes.map(s =>
-        s.id === id ? { ...s, name, updatedAt: Date.now() } : s
+        s.id === id ? { ...s, name: finalName, updatedAt: Date.now() } : s
       );
       this.setData({
         schemes,
         schemeRenameVisible: false,
         schemeRenameChecking: false,
       }, () => {
-        this._saveSchemes();
+        this._saveSchemes(true);
         this._refreshActiveScheme();
-        this.showToast('已保存');
+        this.showToast(usedFallback ? `检测异常，已使用默认名 ${finalName}` : '已保存');
       });
     }).catch(() => {
+      // 极端兜底：promise reject 也走 fallback
       this.setData({ schemeRenameChecking: false });
-      this.showToast('检测失败，请稍后重试');
+      const count = (this.data.schemes || []).length;
+      const finalName = `方案${count + 1}`;
+      const id = this.data.activeSchemeId;
+      const schemes = this.data.schemes.map(s =>
+        s.id === id ? { ...s, name: finalName, updatedAt: Date.now() } : s
+      );
+      this.setData({ schemes, schemeRenameVisible: false }, () => {
+        this._saveSchemes(true);
+        this._refreshActiveScheme();
+        this.showToast(`检测异常，已使用默认名 ${finalName}`);
+      });
     });
   },
 
   // 调用 msgSecCheck 云函数进行内容安全检测
-  // 策略：调用失败/未部署时降级放行（不阻塞用户），仅在明确命中违规时返回 false
-  // resolve(true) 表示通过；resolve(false) 表示违规
+  // 返回值：
+  //   'pass'   通过
+  //   'risky'  明确命中违规
+  //   'error'  云函数未部署/网络异常/接口异常（前端可用默认名 fallback）
+  // 兼容两种云函数返回格式：
+  //   新版：{ pass: bool, risky: bool, ... }
+  //   旧版：{ errcode, detail, result, ... } —— 直接解析微信原始返回
   _msgSecCheck(content) {
     // 基础前置过滤（特殊字符/转义）
     if (/[<>&"'\\\/]/.test(content)) {
-      return Promise.resolve(false);
+      return Promise.resolve('risky');
     }
     const app = getApp();
     const cloudReady = app && app.globalData && app.globalData.cloudInited && wx.cloud;
     if (!cloudReady) {
-      console.warn('[msgSecCheck] 云开发未初始化，本地降级放行');
-      return Promise.resolve(true);
+      console.warn('[msgSecCheck] 云开发未初始化，按异常处理');
+      return Promise.resolve('error');
     }
     return wx.cloud.callFunction({
       name: 'wxSecCheck',
       data: { content, scene: 2 },
     }).then((res) => {
       const r = res && res.result;
-      console.log('[msgSecCheck] 云函数返回', r);
+      console.log('[msgSecCheck] 云函数完整返回', JSON.stringify(r));
       if (!r) {
-        console.warn('[msgSecCheck] 云函数无返回，降级放行');
-        return true;
+        console.warn('[msgSecCheck] 云函数无返回，按异常处理');
+        return 'error';
       }
-      // 明确通过
-      if (r.errcode === 0) {
-        if (r.detail && r.detail.suggest && r.detail.suggest === 'risky') {
-          console.log('[msgSecCheck] 命中违规 suggest=risky');
-          return false;
-        }
-        return true;
+
+      // ====== 兼容新版云函数（含 pass/risky 字段） ======
+      if (r.risky === true) {
+        console.log('[msgSecCheck] [新版] 命中违规');
+        return 'risky';
       }
-      // 明确违规
+      if (r.pass === true) {
+        console.log('[msgSecCheck] [新版] 通过');
+        return 'pass';
+      }
+
+      // ====== 兼容旧版云函数（直接解析微信原始返回） ======
+      // 1. v1 错误码 87014
       if (r.errcode === 87014) {
-        console.log('[msgSecCheck] 命中违规 errcode=87014');
-        return false;
+        console.log('[msgSecCheck] [旧版] 命中违规 errcode=87014');
+        return 'risky';
       }
-      // 其他错误（接口异常/未部署）：降级放行，不阻塞用户
-      console.warn('[msgSecCheck] 接口返回异常，降级放行', r);
-      return true;
+      // 2. v2 顶层 result.suggest
+      if (r.result && (r.result.suggest === 'risky' || r.result.suggest === 'review')) {
+        console.log('[msgSecCheck] [旧版] 命中违规 result.suggest=', r.result.suggest);
+        return 'risky';
+      }
+      // 3. v2 detail 数组
+      if (Array.isArray(r.detail)) {
+        const hit = r.detail.some(d => {
+          if (!d) return false;
+          if (d.suggest === 'risky' || d.suggest === 'review') return true;
+          if (d.errcode && d.errcode !== 0) return true;
+          if (d.label != null && Number(d.label) !== 100) return true;
+          return false;
+        });
+        if (hit) {
+          console.log('[msgSecCheck] [旧版] 命中违规 detail[]', JSON.stringify(r.detail));
+          return 'risky';
+        }
+      }
+      // 4. errcode === 0 视为通过（关键修复：之前漏掉这个分支）
+      if (r.errcode === 0 || r.errcode === undefined) {
+        console.log('[msgSecCheck] [旧版] 通过');
+        return 'pass';
+      }
+      // 其他错误视为接口异常
+      console.warn('[msgSecCheck] 接口返回异常', r);
+      return 'error';
     }).catch((err) => {
-      // 云函数未部署 / 网络异常 / openid 缺失 等：降级放行
-      console.warn('[msgSecCheck] 云函数调用失败，降级放行', err);
-      return true;
+      console.warn('[msgSecCheck] 云函数调用失败', err);
+      return 'error';
     });
   },
 
@@ -1439,7 +1753,7 @@ Page({
       schemeAddColorList: colorList,
       schemeAddColorListFiltered: colorListFiltered,
     }, () => {
-      this._saveSchemes();
+      this._saveSchemes(true);
       this._refreshActiveScheme();
       this.showToast('已添加');
     });
@@ -1458,7 +1772,7 @@ Page({
       };
     });
     this.setData({ schemes }, () => {
-      this._saveSchemes();
+      this._saveSchemes(true);
       this._refreshActiveScheme();
     });
   },
@@ -1477,7 +1791,7 @@ Page({
         const schemes = this.data.schemes.filter(s => s.id !== id);
         const nextActive = schemes.length > 0 ? schemes[0].id : 0;
         this.setData({ schemes, activeSchemeId: nextActive }, () => {
-          this._saveSchemes();
+          this._saveSchemes(true);
           this._refreshActiveScheme();
           this.showToast('已删除');
         });

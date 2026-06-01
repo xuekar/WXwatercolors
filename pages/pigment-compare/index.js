@@ -2,6 +2,8 @@ Page({
   data: {
     items: [],
     total: 0,
+    swatchDrawerVisible: false,
+    swatchDrawerColor: '',
   },
 
   onLoad() {
@@ -25,7 +27,18 @@ Page({
   },
 
   onCardTap(e) {
-    // 预留：未来可拉起颜料详情抽屉
+    const gid = e.currentTarget.dataset.gid;
+    const item = this.data.items.find(i => i._gid === gid);
+    if (item && item.swatch) {
+      this.setData({
+        swatchDrawerVisible: true,
+        swatchDrawerColor: item.swatch,
+      });
+    }
+  },
+
+  onSwatchDrawerClose() {
+    this.setData({ swatchDrawerVisible: false });
   },
 
   onShareAppMessage() {

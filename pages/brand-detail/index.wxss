@@ -1263,9 +1263,9 @@
   gap: 16rpx;
 }
 .compare-cart-brand {
-  width: 60rpx;
-  height: 36rpx;
-  border-radius: 6rpx;
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 8rpx;
   background: #0F2447;
   color: #FFFFFF;
   font-size: 20rpx;

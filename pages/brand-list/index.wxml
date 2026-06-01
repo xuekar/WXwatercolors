@@ -96,8 +96,8 @@
       </view>
     </view>
 
-    <!-- 操作栏：筛选 + 排序（两段） -->
-    <view class="action-bar">
+    <!-- 操作栏：筛选 + 排序 + 对比（三段） -->
+    <view class="action-bar" wx:if="{{!libCompareMode}}">
       <view class="action-btn {{activeFilterCount > 0 ? 'active' : ''}}" bindtap="onLibFilterTap" hover-class="action-hover">
         <text class="action-icon">⌒</text>
         <text class="action-text">筛选</text>
@@ -109,6 +109,26 @@
         <text class="action-text">排序</text>
         <text class="action-sub">{{libSortLabel}}</text>
       </view>
+      <view class="action-divider"></view>
+      <view class="action-btn compare" bindtap="onLibCompareTap" hover-class="action-hover">
+        <text class="action-icon">⊞</text>
+        <text class="action-text">对比</text>
+      </view>
+    </view>
+
+    <!-- 对比模式操作栏 -->
+    <view class="action-bar compare-mode-bar" wx:if="{{libCompareMode}}">
+      <view class="compare-exit" bindtap="onLibCancelCompare" hover-class="action-hover">
+        <text class="compare-exit-text">× 退出对比</text>
+      </view>
+      <view class="compare-clear" bindtap="onLibClearCompare" hover-class="action-hover">
+        <text class="compare-clear-text">⊘ 清空 ({{libCompareCount}})</text>
+      </view>
+    </view>
+
+    <!-- 对比模式提示条 -->
+    <view wx:if="{{libCompareMode}}" class="compare-hint-bar">
+      <text class="compare-hint-text">⊞ 点击颜料加入对比</text>
     </view>
 
     <!-- 已应用筛选 chip 区 -->
@@ -140,7 +160,7 @@
       wx:if="{{!libLoading}}"
     >
       <view
-        class="lib-row"
+        class="lib-row {{libCompareMode && item._compareSelected ? 'compare-selected' : ''}}"
         wx:for="{{libRendered}}"
         wx:key="_gid"
         data-gid="{{item._gid}}"
@@ -160,9 +180,13 @@
           <view class="lib-color-no">{{item.colorNo}}</view>
           <view class="lib-pigment-trans">{{item._metaSub}}</view>
         </view>
-        <view class="lib-swatch-wrap">
+        <view wx:if="{{!libCompareMode}}" class="lib-swatch-wrap">
           <view wx:if="{{item.swatch}}" class="lib-swatch" style="background: {{item.swatch}}"></view>
           <view wx:else class="lib-swatch lib-swatch-empty">—</view>
+        </view>
+        <view wx:if="{{libCompareMode}}" class="lib-compare-check">
+          <view wx:if="{{item._compareSelected}}" class="lib-compare-checked">✓</view>
+          <view wx:else class="lib-compare-unchecked"></view>
         </view>
       </view>
 
@@ -903,6 +927,60 @@
           <text class="drawer-action-icon">{{drawerPigment.owned ? '−' : '+'}}</text>
           <text class="drawer-action-text">{{drawerPigment.owned ? '取消拥有' : '标记为已拥有'}}</text>
         </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 色彩库对比模式底部横条 -->
+  <view class="lib-compare-bar {{libCompareMode ? 'show' : ''}}">
+    <view class="lib-compare-bar-left" bindtap="onLibCompareCartTap" hover-class="action-hover">
+      <view class="lib-compare-bar-icon">
+        <view class="lib-compare-cube"></view>
+        <view class="lib-compare-cube"></view>
+        <view class="lib-compare-cube"></view>
+        <view class="lib-compare-cube"></view>
+        <view wx:if="{{libCompareCount > 0}}" class="lib-compare-badge">{{libCompareCount > 99 ? '99+' : libCompareCount}}</view>
+      </view>
+      <view class="lib-compare-bar-info">
+        <text class="lib-compare-bar-count">已选 {{libCompareCount}} 个颜料</text>
+        <text class="lib-compare-bar-link">点击查看清单 ›</text>
+      </view>
+    </view>
+    <view class="lib-compare-bar-btn" bindtap="onLibCompareConfirm" hover-class="action-hover">确定 →</view>
+  </view>
+
+  <!-- 色彩库对比清单 popup -->
+  <view class="mask {{libCompareCartVisible ? 'show' : ''}}" bindtap="onLibCompareCartClose">
+    <view class="filter-panel {{libCompareCartVisible ? 'show' : ''}}" catchtap="noop">
+      <view class="filter-handle"></view>
+      <view class="compare-cart-title">已选颜料清单</view>
+      <view class="compare-cart-subtitle">共 {{libCompareCount}} 个 · 选好后点击确定进入对比</view>
+
+      <scroll-view scroll-y class="compare-cart-list">
+        <view
+          class="compare-cart-row"
+          wx:for="{{libCompareList}}"
+          wx:key="_gid"
+        >
+          <view class="compare-cart-brand">{{item._brandAbbr || '?'}}</view>
+          <view class="compare-cart-mid">
+            <view class="compare-cart-no">{{item.colorNo}}</view>
+            <view class="compare-cart-cn">{{item.nameCn}}</view>
+          </view>
+          <view class="compare-cart-swatch" style="background: {{item.swatch || '#FAFAFA'}}"></view>
+          <view
+            class="compare-cart-remove"
+            data-gid="{{item._gid}}"
+            catchtap="onLibCompareCartRemove"
+            hover-class="compare-cart-remove-hover"
+          >×</view>
+        </view>
+        <view wx:if="{{libCompareList.length === 0}}" class="compare-cart-empty">对比颜料为空</view>
+      </scroll-view>
+
+      <view class="filter-actions">
+        <view class="filter-btn secondary" bindtap="onLibClearCompare" hover-class="filter-btn-hover">清空</view>
+        <view class="filter-btn primary" bindtap="onLibCompareConfirm" hover-class="filter-btn-hover">确定 ({{libCompareCount}}) → 对比</view>
       </view>
     </view>
   </view>

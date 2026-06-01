@@ -12,7 +12,7 @@ App({
     // 若未开通云开发，会自动降级（_msgSecCheck 中已做容错）
     if (wx.cloud) {
       try {
-        wx.cloud.init({ env: 'cloud1-d6gd6kerl873e0d0c', traceUser: true });
+        wx.cloud.init({ env: 'shuicaigongfang-d8feu0h5c1a027bd', traceUser: true });
         this.globalData.cloudInited = true;
         console.log('[app] wx.cloud 初始化成功');
       } catch (err) {
@@ -44,6 +44,27 @@ App({
       console.log('[app] 已恢复用户标记统计', this.globalData.ownedCounts);
     } catch (err) {
       console.error('[app] 读取本地状态失败', err);
+    }
+
+    // 异步从云端拉取并合并状态（覆盖本地缓存清理或跨设备场景）
+    console.log('[app] cloudInited =', this.globalData.cloudInited);
+    if (this.globalData.cloudInited) {
+      try {
+        const pigmentStore = require('./utils/pigment-store.js');
+        console.log('[app] 调用 pigmentStore.pullFromCloud');
+        pigmentStore.pullFromCloud().then(res => {
+          console.log('[app] pullFromCloud 返回', res);
+          if (res && res.success) {
+            console.log('[app] 云端用户状态拉取成功');
+          }
+        }).catch(err => {
+          console.warn('[app] 云端拉取失败（已用本地数据）', err);
+        });
+      } catch (err) {
+        console.warn('[app] 云端拉取调用异常', err);
+      }
+    } else {
+      console.warn('[app] cloudInited=false，跳过云端拉取');
     }
   },
   onShow() {
