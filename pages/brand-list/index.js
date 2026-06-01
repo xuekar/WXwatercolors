@@ -1132,21 +1132,32 @@ Page({
       return;
     }
     this.setData({ lotterySaveChecking: true });
-    this._msgSecCheck(name).then(pass => {
-      if (!pass) {
+    this._msgSecCheck(name).then(result => {
+      if (result === 'risky') {
         this.setData({ lotterySaveChecking: false });
         this.showToast('名称含违规内容，请修改');
         return;
       }
-      this._persistLotteryAsScheme(name);
+      // 接口异常（error）则使用默认名 "方案X"，X=已保存方案数+1
+      let finalName = name;
+      let usedFallback = false;
+      if (result === 'error') {
+        const count = (this.data.schemes || []).length;
+        finalName = `方案${count + 1}`;
+        usedFallback = true;
+      }
+      this._persistLotteryAsScheme(finalName, usedFallback);
     }).catch(() => {
+      // 极端兜底
       this.setData({ lotterySaveChecking: false });
-      this.showToast('检测失败，请稍后重试');
+      const count = (this.data.schemes || []).length;
+      const finalName = `方案${count + 1}`;
+      this._persistLotteryAsScheme(finalName, true);
     });
   },
 
   // 把当前 lotteryDrawn 写入 schemes（与色彩方完全同结构）
-  _persistLotteryAsScheme(name) {
+  _persistLotteryAsScheme(name, usedFallback) {
     const drawn = this.data.lotteryDrawn || [];
     const gids = drawn.map(p => p._gid).filter(Boolean);
     const now = Date.now();
@@ -1168,7 +1179,7 @@ Page({
       this._saveSchemes(true);
       this._refreshLotterySchemeProgress();
       this._saveLotteryCurrent({ saved: true });  // 同步落盘 saved 状态（跨编译保留置灰态）
-      this.showToast('已保存到色彩方');
+      this.showToast(usedFallback ? `检测异常，已使用默认名 ${name}` : '已保存到色彩方');
     });
   },
 
@@ -1501,16 +1512,24 @@ Page({
     }
     if (this.data.schemeRenameChecking) return;
     this.setData({ schemeRenameChecking: true });
-    this._msgSecCheck(name).then(pass => {
-      if (!pass) {
+    this._msgSecCheck(name).then(result => {
+      if (result === 'risky') {
         this.setData({ schemeRenameChecking: false });
         this.showToast('名称含违规内容，请修改');
         return;
       }
+      // 接口异常（error）则使用默认名 "方案X"，X=已保存方案数+1
+      let finalName = name;
+      let usedFallback = false;
+      if (result === 'error') {
+        const count = (this.data.schemes || []).length;
+        finalName = `方案${count + 1}`;
+        usedFallback = true;
+      }
       // 保存
       const id = this.data.activeSchemeId;
       const schemes = this.data.schemes.map(s =>
-        s.id === id ? { ...s, name, updatedAt: Date.now() } : s
+        s.id === id ? { ...s, name: finalName, updatedAt: Date.now() } : s
       );
       this.setData({
         schemes,
@@ -1519,58 +1538,101 @@ Page({
       }, () => {
         this._saveSchemes(true);
         this._refreshActiveScheme();
-        this.showToast('已保存');
+        this.showToast(usedFallback ? `检测异常，已使用默认名 ${finalName}` : '已保存');
       });
     }).catch(() => {
+      // 极端兜底：promise reject 也走 fallback
       this.setData({ schemeRenameChecking: false });
-      this.showToast('检测失败，请稍后重试');
+      const count = (this.data.schemes || []).length;
+      const finalName = `方案${count + 1}`;
+      const id = this.data.activeSchemeId;
+      const schemes = this.data.schemes.map(s =>
+        s.id === id ? { ...s, name: finalName, updatedAt: Date.now() } : s
+      );
+      this.setData({ schemes, schemeRenameVisible: false }, () => {
+        this._saveSchemes(true);
+        this._refreshActiveScheme();
+        this.showToast(`检测异常，已使用默认名 ${finalName}`);
+      });
     });
   },
 
   // 调用 msgSecCheck 云函数进行内容安全检测
-  // 策略：调用失败/未部署时降级放行（不阻塞用户），仅在明确命中违规时返回 false
-  // resolve(true) 表示通过；resolve(false) 表示违规
+  // 返回值：
+  //   'pass'   通过
+  //   'risky'  明确命中违规
+  //   'error'  云函数未部署/网络异常/接口异常（前端可用默认名 fallback）
+  // 兼容两种云函数返回格式：
+  //   新版：{ pass: bool, risky: bool, ... }
+  //   旧版：{ errcode, detail, result, ... } —— 直接解析微信原始返回
   _msgSecCheck(content) {
     // 基础前置过滤（特殊字符/转义）
     if (/[<>&"'\\\/]/.test(content)) {
-      return Promise.resolve(false);
+      return Promise.resolve('risky');
     }
     const app = getApp();
     const cloudReady = app && app.globalData && app.globalData.cloudInited && wx.cloud;
     if (!cloudReady) {
-      console.warn('[msgSecCheck] 云开发未初始化，本地降级放行');
-      return Promise.resolve(true);
+      console.warn('[msgSecCheck] 云开发未初始化，按异常处理');
+      return Promise.resolve('error');
     }
     return wx.cloud.callFunction({
       name: 'wxSecCheck',
       data: { content, scene: 2 },
     }).then((res) => {
       const r = res && res.result;
-      console.log('[msgSecCheck] 云函数返回', r);
+      console.log('[msgSecCheck] 云函数完整返回', JSON.stringify(r));
       if (!r) {
-        console.warn('[msgSecCheck] 云函数无返回，降级放行');
-        return true;
+        console.warn('[msgSecCheck] 云函数无返回，按异常处理');
+        return 'error';
       }
-      // 明确通过
-      if (r.errcode === 0) {
-        if (r.detail && r.detail.suggest && r.detail.suggest === 'risky') {
-          console.log('[msgSecCheck] 命中违规 suggest=risky');
-          return false;
-        }
-        return true;
+
+      // ====== 兼容新版云函数（含 pass/risky 字段） ======
+      if (r.risky === true) {
+        console.log('[msgSecCheck] [新版] 命中违规');
+        return 'risky';
       }
-      // 明确违规
+      if (r.pass === true) {
+        console.log('[msgSecCheck] [新版] 通过');
+        return 'pass';
+      }
+
+      // ====== 兼容旧版云函数（直接解析微信原始返回） ======
+      // 1. v1 错误码 87014
       if (r.errcode === 87014) {
-        console.log('[msgSecCheck] 命中违规 errcode=87014');
-        return false;
+        console.log('[msgSecCheck] [旧版] 命中违规 errcode=87014');
+        return 'risky';
       }
-      // 其他错误（接口异常/未部署）：降级放行，不阻塞用户
-      console.warn('[msgSecCheck] 接口返回异常，降级放行', r);
-      return true;
+      // 2. v2 顶层 result.suggest
+      if (r.result && (r.result.suggest === 'risky' || r.result.suggest === 'review')) {
+        console.log('[msgSecCheck] [旧版] 命中违规 result.suggest=', r.result.suggest);
+        return 'risky';
+      }
+      // 3. v2 detail 数组
+      if (Array.isArray(r.detail)) {
+        const hit = r.detail.some(d => {
+          if (!d) return false;
+          if (d.suggest === 'risky' || d.suggest === 'review') return true;
+          if (d.errcode && d.errcode !== 0) return true;
+          if (d.label != null && Number(d.label) !== 100) return true;
+          return false;
+        });
+        if (hit) {
+          console.log('[msgSecCheck] [旧版] 命中违规 detail[]', JSON.stringify(r.detail));
+          return 'risky';
+        }
+      }
+      // 4. errcode === 0 视为通过（关键修复：之前漏掉这个分支）
+      if (r.errcode === 0 || r.errcode === undefined) {
+        console.log('[msgSecCheck] [旧版] 通过');
+        return 'pass';
+      }
+      // 其他错误视为接口异常
+      console.warn('[msgSecCheck] 接口返回异常', r);
+      return 'error';
     }).catch((err) => {
-      // 云函数未部署 / 网络异常 / openid 缺失 等：降级放行
-      console.warn('[msgSecCheck] 云函数调用失败，降级放行', err);
-      return true;
+      console.warn('[msgSecCheck] 云函数调用失败', err);
+      return 'error';
     });
   },
 
