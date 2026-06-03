@@ -131,6 +131,9 @@ Page({
     libCompareCount: 0,
     libCompareList: [],
     libCompareCartVisible: false,
+
+    // 下拉刷新（scroll-view refresher）loading 状态
+    refresherTriggered: false,
   },
 
   onLoad(options) {
@@ -210,6 +213,70 @@ Page({
       this._allPigments = null;
       if (this.data.activeTab === 'library') this._reloadLibraryDataIfNeeded();
     }
+
+    // 主动触发云端拉取并等待结果（重要：仅靠 app.onShow 触发会因为时序问题无法刷新页面）
+    if (app && app.globalData && app.globalData.cloudInited) {
+      try {
+        const pigmentStore = require('../../utils/pigment-store.js');
+        pigmentStore.pullFromCloud().then(res => {
+          if (res && res.success && !res.skipped) {
+            // 拉取完成且确实有刷新（非节流跳过）→ 检查 userStatesSyncedAt 是否更新
+            if (app.globalData.userStatesSyncedAt &&
+                app.globalData.userStatesSyncedAt !== this._lastUserStatesSyncedAt) {
+              this._lastUserStatesSyncedAt = app.globalData.userStatesSyncedAt;
+              console.log('[brand-list] onShow 后云端状态已同步，刷新页面');
+              this._allPigments = null;
+              this.refresh();
+              if (this.data.activeTab === 'library') this._reloadLibraryDataIfNeeded();
+              else if (this.data.activeTab === 'scheme') this._enterScheme();
+            }
+          }
+        });
+      } catch (err) {
+        console.warn('[brand-list] onShow 触发 pull 异常', err);
+      }
+    }
+  },
+
+  // 下拉刷新（scroll-view refresher 触发）：5 秒内只能拉取一次
+  onPagePullRefresh() {
+    const now = Date.now();
+    if (this._lastPullDownAt && now - this._lastPullDownAt < 5000) {
+      const wait = Math.ceil((5000 - (now - this._lastPullDownAt)) / 1000);
+      this.setData({ refresherTriggered: false });
+      this.showToast(`请 ${wait}s 后再试`);
+      return;
+    }
+    this._lastPullDownAt = now;
+    this.setData({ refresherTriggered: true });
+    const app = getApp();
+    if (!app || !app.globalData || !app.globalData.cloudInited) {
+      this.setData({ refresherTriggered: false });
+      this.showToast('云端未就绪');
+      return;
+    }
+    const pigmentStore = require('../../utils/pigment-store.js');
+    pigmentStore.pullFromCloud(true).then(res => {
+      this.setData({ refresherTriggered: false });
+      if (res && res.success && !res.skipped) {
+        this._allPigments = null;
+        this.refresh();
+        if (this.data.activeTab === 'library') this._reloadLibraryDataIfNeeded();
+        else if (this.data.activeTab === 'scheme') this._enterScheme();
+        this.showToast('已同步最新');
+      } else {
+        this.showToast('已是最新');
+      }
+    }).catch(() => {
+      this.setData({ refresherTriggered: false });
+      this.showToast('刷新失败');
+    });
+  },
+
+  // 兼容（小程序原生下拉刷新，目前未启用）
+  onPullDownRefresh() {
+    this.onPagePullRefresh();
+    wx.stopPullDownRefresh();
   },
 
   refresh() {
@@ -491,7 +558,7 @@ Page({
           ? { ...p, owned: nextOwned, wishlist: nextOwned ? false : p.wishlist }
           : p
       );
-      pigmentStore.savePigments(cur.brandId, updated);
+      pigmentStore.savePigments(cur.brandId, updated, true);
       // 同步更新内存全量数据
       this._allPigments.forEach(p => {
         if (p._gid === cur._gid) {
@@ -519,7 +586,7 @@ Page({
       const updated = list.map(p =>
         p.id === cur.id ? { ...p, wishlist: nextWish } : p
       );
-      pigmentStore.savePigments(cur.brandId, updated);
+      pigmentStore.savePigments(cur.brandId, updated, true);
       this._allPigments.forEach(p => {
         if (p._gid === cur._gid) {
           p.wishlist = nextWish;
@@ -585,6 +652,7 @@ Page({
         list.push({
           _gid: p._gid,
           colorNo: p.colorNo,
+          displayColorNo: p.displayColorNo || p.colorNo,
           nameCn: p.nameCn,
           nameEn: p.nameEn,
           pigment: p.pigment,
@@ -1704,6 +1772,7 @@ Page({
         _gid: p._gid,
         id: p.id,
         colorNo: p.colorNo,
+        displayColorNo: p.displayColorNo || p.colorNo,
         nameCn: p.nameCn,
         nameEn: p.nameEn,
         swatch: p.swatch,

@@ -74,6 +74,8 @@ Page({
     ownedCount: 0,
     checkedCount: 0,
     allSelected: false,
+    // 下拉刷新 loading 状态
+    refresherTriggered: false,
     // ==== 对比模式（V5 新增） ====
     compareMode: false,
     compareCount: 0,
@@ -172,6 +174,48 @@ Page({
   },
   onUnload() {
     console.log('[detail] onUnload', Date.now());
+  },
+
+  // 下拉刷新（scroll-view refresher 触发）：5 秒内只能拉取一次
+  onPagePullRefresh() {
+    const now = Date.now();
+    if (this._lastPullDownAt && now - this._lastPullDownAt < 5000) {
+      const wait = Math.ceil((5000 - (now - this._lastPullDownAt)) / 1000);
+      this.setData({ refresherTriggered: false });
+      this.showToast(`请 ${wait}s 后再试`);
+      return;
+    }
+    this._lastPullDownAt = now;
+    this.setData({ refresherTriggered: true });
+    const app = getApp();
+    if (!app || !app.globalData || !app.globalData.cloudInited) {
+      this.setData({ refresherTriggered: false });
+      this.showToast('云端未就绪');
+      return;
+    }
+    const pigmentStore = require('../../utils/pigment-store.js');
+    pigmentStore.pullFromCloud(true).then(res => {
+      this.setData({ refresherTriggered: false });
+      if (res && res.success && !res.skipped) {
+        pigmentStore.getPigmentsAsync(this.data.brandId).then(list => {
+          this._pigments = list;
+          this.applyFilterAndSort();
+          this.refreshStat();
+          this.showToast('已同步最新');
+        });
+      } else {
+        this.showToast('已是最新');
+      }
+    }).catch(() => {
+      this.setData({ refresherTriggered: false });
+      this.showToast('刷新失败');
+    });
+  },
+
+  // 兼容（小程序原生下拉刷新，目前未启用）
+  onPullDownRefresh() {
+    this.onPagePullRefresh();
+    wx.stopPullDownRefresh();
   },
 
   // ==== 虚拟分页 ====
@@ -401,12 +445,25 @@ Page({
   onUnownedTap(e) {
     if (!this._pigments) return;
     const { id } = e.currentTarget.dataset;
+    // 同步更新所有 _pigments 的 checked 状态（owned -> true，被点击的 id 也设为 true）
     this._pigments = this._pigments.map(p => {
       if (p.id === id) return { ...p, checked: true };
       return { ...p, checked: p.owned };
     });
-    this.setData({ markMode: true }, () => {
-      this.applyFilterAndSort();
+    // 同步更新 _filteredFull
+    if (Array.isArray(this._filteredFull)) {
+      this._filteredFull = this._filteredFull.map(p => {
+        const fresh = this._pigments.find(x => x.id === p.id);
+        return fresh || p;
+      });
+    }
+    // 同步更新已渲染的 filteredPigments（保留分页/滚动位置不变）
+    const rendered = (this.data.filteredPigments || []).map(p => {
+      const fresh = this._pigments.find(x => x.id === p.id);
+      return fresh ? { ...fresh, _compareSelected: p._compareSelected } : p;
+    });
+    this.setData({ markMode: true, filteredPigments: rendered }, () => {
+      this.refreshStat();
     });
   },
   onCancelMark() {
@@ -423,10 +480,22 @@ Page({
       return;
     }
     if (this.data.markMode) {
-      this._pigments = this._pigments.map(p =>
-        p.id === id ? { ...p, checked: !p.checked } : p
+      // 标注模式：只 toggle 当前行的 checked，不重置分页/不触发滚动回滚
+      const idx = this._pigments.findIndex(p => p.id === id);
+      if (idx === -1) return;
+      const next = !this._pigments[idx].checked;
+      this._pigments[idx] = { ...this._pigments[idx], checked: next };
+      // 同步更新 _filteredFull 和已渲染的 filteredPigments
+      if (Array.isArray(this._filteredFull)) {
+        const fIdx = this._filteredFull.findIndex(p => p.id === id);
+        if (fIdx >= 0) this._filteredFull[fIdx] = this._pigments[idx];
+      }
+      const rendered = (this.data.filteredPigments || []).map(p =>
+        p.id === id ? { ...p, checked: next } : p
       );
-      this.applyFilterAndSort();
+      this.setData({ filteredPigments: rendered }, () => {
+        this.refreshStat();
+      });
     } else {
       const pigment = this._pigments.find(p => p.id === id);
       if (pigment) this.openDrawer(pigment);
@@ -451,7 +520,7 @@ Page({
         ? { ...p, owned: nextOwned, checked: nextOwned, wishlist: nextOwned ? false : p.wishlist }
         : p
     );
-    pigmentStore.savePigments(this.data.brandId, this._pigments);
+    pigmentStore.savePigments(this.data.brandId, this._pigments, true);
     const updated = this._pigments.find(p => p.id === cur.id);
     this.setData({ drawerPigment: updated }, () => {
       this.applyFilterAndSort();
@@ -467,7 +536,7 @@ Page({
     this._pigments = this._pigments.map(p =>
       p.id === cur.id ? { ...p, wishlist: nextWish } : p
     );
-    pigmentStore.savePigments(this.data.brandId, this._pigments);
+    pigmentStore.savePigments(this.data.brandId, this._pigments, true);
     const updated = this._pigments.find(p => p.id === cur.id);
     this.setData({ drawerPigment: updated }, () => {
       this.showToast(nextWish ? '已加入心愿单' : '已移出心愿单');
@@ -484,7 +553,7 @@ Page({
       owned: p.checked,
       wishlist: p.checked ? false : p.wishlist,  // 已拥有时强制清空心愿单
     }));
-    pigmentStore.savePigments(this.data.brandId, this._pigments);
+    pigmentStore.savePigments(this.data.brandId, this._pigments, true);  // 立即推送云端
     const ownedCount = this._pigments.filter(p => p.owned).length;
     this.setData({ markMode: false }, () => {
       this.applyFilterAndSort();
@@ -578,6 +647,7 @@ Page({
           _gid: `${this.data.brandId}_${p.id}`,
           id: p.id,
           colorNo: p.colorNo,
+          displayColorNo: p.displayColorNo || p.colorNo,
           nameCn: p.nameCn,
           nameEn: p.nameEn,
           pigment: p.pigment,

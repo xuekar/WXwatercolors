@@ -13,6 +13,7 @@ const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
 const db = cloud.database();
+const _ = db.command;
 const COLL = 'user_schemes';
 
 function isCollectionNotExist(err) {
@@ -71,8 +72,12 @@ exports.main = async (event = {}) => {
       const now = Date.now();
       const res = await safeGet(OPENID);
       if (res.data && res.data.length > 0) {
+        // 用 _.set() 强制替换整个 schemes 数组，避免数据库做合并操作
         await db.collection(COLL).doc(res.data[0]._id).update({
-          data: { schemes: incoming, updatedAt: now },
+          data: {
+            schemes: _.set(incoming),
+            updatedAt: now,
+          },
         });
       } else {
         // 关键：云函数中 add 必须手动写入 _openid，否则查询不到

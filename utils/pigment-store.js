@@ -21,8 +21,10 @@ const SYNCED_AT_KEY = 'wc_user_states_synced_at_v1'; // 上次成功同步云端
 
 let _userStates = null;  // 内存中的用户状态副本（首次访问时从 storage 读取）
 let _cloudPullStarted = false;
-let _cloudPullPromise = null;
+let _cloudPullPromise = null;  // 进行中的 pull promise（仅 in-flight 期间有值，完成后会清空）
 let _pushTimer = null;
+let _lastPushAt = 0;  // 最近一次 push 完成时间戳（用于和 pull 回调判断时序，避免竞态覆盖）
+let _lastPullAt = 0;  // 最近一次 pull 完成时间戳（用于冷却节流）
 
 function _loadStatesFromStorage() {
   if (_userStates) return _userStates;
@@ -52,12 +54,19 @@ function _isCloudReady() {
   return !!wx.cloud;
 }
 
-// 拉取云端状态并合并到本地（首次启动时调用）
-function pullFromCloud() {
-  console.log('[pigment-store] pullFromCloud 入口');
+// 拉取云端状态并合并到本地
+// force=true 强制重新拉取（用于 onShow 等需要最新状态的场景）
+function pullFromCloud(force) {
+  console.log('[pigment-store] pullFromCloud 入口 force=', !!force);
+  // in-flight 复用：仅当当前已有进行中的 pull 时复用
   if (_cloudPullPromise) {
     console.log('[pigment-store] 已有进行中的 pullPromise，复用');
     return _cloudPullPromise;
+  }
+  // 非 force 模式下，10 秒内不重复拉取（节流，避免短时间内频繁调用）
+  if (!force && _lastPullAt > 0 && Date.now() - _lastPullAt < 10000) {
+    console.log('[pigment-store] 距上次 pull 不足 10s，跳过');
+    return Promise.resolve({ success: true, skipped: true, reason: 'throttled' });
   }
   if (!_isCloudReady()) {
     console.warn('[pigment-store] 云开发未就绪，跳过云端拉取');
@@ -65,6 +74,7 @@ function pullFromCloud() {
   }
   console.log('[pigment-store] 调用 syncUserStates 云函数 action=pull');
   _cloudPullStarted = true;
+  const pullStartedAt = Date.now();
   _cloudPullPromise = wx.cloud.callFunction({
     name: 'syncUserStates',
     data: { action: 'pull' },
@@ -72,11 +82,30 @@ function pullFromCloud() {
     console.log('[pigment-store] syncUserStates pull 返回', res && res.result);
     const r = res && res.result;
     if (r && r.success) {
+      // 关键：如果 push 在 pull 之后发生，本次 pull 拿到的是旧数据，必须丢弃
+      if (_lastPushAt > pullStartedAt) {
+        console.log('[pigment-store] pull 发起后用户已 push，丢弃本次 pull 结果（避免覆盖最新本地状态）');
+        return { success: true, skipped: true };
+      }
       const cloudStates = r.states || {};
-      // 合并：云端 + 本地，按 markedAt 取较新
-      const local = _loadStatesFromStorage();
-      const merged = _mergeTwoStates(local, cloudStates);
-      _userStates = merged;
+      const cloudUpdatedAt = r.updatedAt || 0;
+      // 读本地上次同步时间戳
+      let localSyncedAt = 0;
+      try { localSyncedAt = Number(wx.getStorageSync(SYNCED_AT_KEY) || 0); } catch (e) {}
+
+      let finalStates;
+      if (cloudUpdatedAt > 0 && cloudUpdatedAt >= localSyncedAt) {
+        // 云端记录的最后更新时间 ≥ 本地上次同步时间 → 云端是权威，直接采用
+        // 这种场景包括：用户在另一台设备上做了删除操作（合并算法无法识别"已删除"）
+        finalStates = cloudStates;
+        console.log('[pigment-store] 云端时间戳较新，直接采用云端状态');
+      } else {
+        // 本地有云端不知道的更新（比如离线时操作）→ 走合并
+        const local = _loadStatesFromStorage();
+        finalStates = _mergeTwoStates(local, cloudStates);
+        console.log('[pigment-store] 本地有未同步的更新，按 markedAt 合并');
+      }
+      _userStates = finalStates;
       _saveStatesToStorage();
       try { wx.setStorageSync(SYNCED_AT_KEY, Date.now()); } catch (e) {}
       // 重置颜料缓存，让下次 _loadAsync 用新合并后的 states
@@ -96,6 +125,11 @@ function pullFromCloud() {
   }).catch(err => {
     console.error('[pigment-store] 拉取云端异常', err);
     return { success: false, reason: String(err && err.message || err) };
+  }).then(result => {
+    // 无论成功失败，都清空 _cloudPullPromise 让下次能再拉取，并记录时间用于节流
+    _cloudPullPromise = null;
+    _lastPullAt = Date.now();
+    return result;
   });
   return _cloudPullPromise;
 }
@@ -113,6 +147,7 @@ function _schedulePushToCloud() {
     }).then(res => {
       const r = res && res.result;
       if (r && r.success) {
+        _lastPushAt = Date.now();  // 记录 push 完成时间
         try { wx.setStorageSync(SYNCED_AT_KEY, Date.now()); } catch (e) {}
         console.log('[pigment-store] 云端推送成功');
       } else {
@@ -121,7 +156,45 @@ function _schedulePushToCloud() {
     }).catch(err => {
       console.warn('[pigment-store] 云端推送异常（已保留本地）', err);
     });
-  }, 800); // 800ms 防抖，避免连续点击产生过多调用
+  }, 800);
+}
+
+// 立即推送到云端（用于关键操作，不防抖）
+function _pushToCloudNow() {
+  console.log('[pigment-store] _pushToCloudNow 被调用');
+  if (!_isCloudReady()) {
+    console.warn('[pigment-store] 云开发未就绪，跳过 push');
+    return;
+  }
+  if (_pushTimer) {
+    clearTimeout(_pushTimer);
+    _pushTimer = null;
+  }
+  const states = _userStates || {};
+  // 诊断：打印每个品牌的 owned/wishlist 数量，便于排查
+  const brandSummary = {};
+  Object.keys(states).forEach(bid => {
+    let o = 0, w = 0;
+    Object.values(states[bid] || {}).forEach(s => { if (s.owned) o++; if (s.wishlist) w++; });
+    brandSummary[bid] = { owned: o, wishlist: w };
+  });
+  console.log('[pigment-store] 即将推送到云端 states 概要', JSON.stringify(brandSummary));
+  wx.cloud.callFunction({
+    name: 'syncUserStates',
+    data: { action: 'push', states },
+  }).then(res => {
+    const r = res && res.result;
+    console.log('[pigment-store] push 云函数返回', JSON.stringify(r));
+    if (r && r.success) {
+      _lastPushAt = Date.now();  // 记录 push 完成时间，让进行中的 pull 知道丢弃
+      try { wx.setStorageSync(SYNCED_AT_KEY, Date.now()); } catch (e) {}
+      console.log('[pigment-store] 云端推送成功（立即），updatedAt =', r.updatedAt);
+    } else {
+      console.warn('[pigment-store] 云端推送失败', r);
+    }
+  }).catch(err => {
+    console.warn('[pigment-store] 云端推送异常（已保留本地）', err);
+  });
 }
 
 // 合并两份 states，按 markedAt 取较新；缺失字段补默认值
@@ -148,7 +221,7 @@ function _mergeTwoStates(a, b) {
 }
 
 // 把整个品牌的最新数据回写到 _userStates，并落盘
-function _persistBrandStates(brandId, list) {
+function _persistBrandStates(brandId, list, immediate) {
   const states = _loadStatesFromStorage();
   const brandStates = {};
   list.forEach(p => {
@@ -167,8 +240,12 @@ function _persistBrandStates(brandId, list) {
     delete states[brandId];
   }
   _saveStatesToStorage();
-  // 异步推送到云端
-  _schedulePushToCloud();
+  // 推送到云端：immediate=true 立即推送（关键操作），否则 800ms 防抖
+  if (immediate) {
+    _pushToCloudNow();
+  } else {
+    _schedulePushToCloud();
+  }
 }
 
 // 把 storage 中的用户状态合并到原始 list（仅 owned/wishlist/markedAt 三字段）
@@ -237,7 +314,18 @@ function _loadAsync(brandId) {
       try {
         if (!_pigmentsCache[brandId]) {
           const loader = PIGMENT_LOADERS[brandId];
-          const src = loader ? loader() : [];
+          let src = loader ? loader() : [];
+          // 史明克（brandId=3）色号默认显示去掉前缀 14 后的后三位
+          if (Number(brandId) === 3) {
+            src = src.map(p => ({
+              ...p,
+              displayColorNo: (p.colorNo && p.colorNo.startsWith('14') && p.colorNo.length > 3)
+                ? p.colorNo.slice(2)
+                : p.colorNo,
+            }));
+          } else {
+            src = src.map(p => ({ ...p, displayColorNo: p.colorNo }));
+          }
           // 关键：从原始数据出发，合并 storage 中的用户标记
           _pigmentsCache[brandId] = _mergeUserStates(brandId, src);
           // 同步一次统计数到 globalData（页面初次进来时品牌列表能立即拿到正确数字）
@@ -278,7 +366,7 @@ module.exports = {
     return !!_pigmentsCache[Number(brandId)];
   },
 
-  savePigments(brandId, list) {
+  savePigments(brandId, list, immediate) {
     const id = Number(brandId);
     const now = Date.now();
     const oldList = _pigmentsCache[id] || [];
@@ -303,8 +391,8 @@ module.exports = {
       };
     });
     _syncCounts(id, _pigmentsCache[id]);
-    // 持久化到 wx.storage + 异步推送云端
-    _persistBrandStates(id, _pigmentsCache[id]);
+    // 持久化到 wx.storage + 推送云端（immediate=true 立即推送）
+    _persistBrandStates(id, _pigmentsCache[id], immediate);
   },
 
   // 调试用：清空所有用户标记状态（同时清云端）

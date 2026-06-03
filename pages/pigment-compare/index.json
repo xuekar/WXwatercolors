@@ -2,5 +2,7 @@
   "navigationBarTitleText": "颜料对比",
   "navigationBarBackgroundColor": "#FFFFFF",
   "navigationBarTextStyle": "black",
-  "backgroundColor": "#F5F6F8"
+  "backgroundColor": "#F5F6F8",
+  "enablePullDownRefresh": true,
+  "backgroundTextStyle": "dark"
 }

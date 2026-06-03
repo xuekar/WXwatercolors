@@ -11,7 +11,7 @@ const BRANDS = [
   { id: 6, nameCn: 'M. Graham',    nameEn: 'M. Graham & Co.',      iconText: 'MG',  color: 'linear-gradient(135deg, #6A4C93, #432B6A)', colorNo: 6 },
 ];
 
-const BRAND_TOTAL = { 1: 116, 2: 188, 3: 190, 4: 181, 5: 135, 6: 72 };
+const BRAND_TOTAL = { 1: 115, 2: 188, 3: 189, 4: 181, 5: 135, 6: 72 };
 const TOTAL_PIGMENTS = Object.values(BRAND_TOTAL).reduce((s, n) => s + n, 0);
 
 function _getOwnedCount(brandId) {

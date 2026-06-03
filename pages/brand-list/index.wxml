@@ -48,7 +48,9 @@
       <view class="filter-count">共 {{filteredList.length}} 个品牌</view>
     </view>
 
-    <scroll-view scroll-y class="list-scroll" enhanced show-scrollbar="{{false}}">
+    <scroll-view scroll-y class="list-scroll" enhanced show-scrollbar="{{false}}"
+      refresher-enabled refresher-default-style="black" refresher-background="#F5F5F5"
+      refresher-triggered="{{refresherTriggered}}" bindrefresherrefresh="onPagePullRefresh">
       <view class="list" wx:if="{{filteredList.length > 0}}">
         <view
           class="brand-card"
@@ -158,6 +160,8 @@
       bindscrolltolower="onLibScrollLower"
       lower-threshold="200"
       wx:if="{{!libLoading}}"
+      refresher-enabled refresher-default-style="black" refresher-background="#F5F5F5"
+      refresher-triggered="{{refresherTriggered}}" bindrefresherrefresh="onPagePullRefresh"
     >
       <view
         class="lib-row {{libCompareMode && item._compareSelected ? 'compare-selected' : ''}}"
@@ -177,7 +181,7 @@
           <view class="lib-name-en">{{item.nameEn}}</view>
         </view>
         <view class="lib-meta">
-          <view class="lib-color-no">{{item.colorNo}}</view>
+          <view class="lib-color-no">{{item.displayColorNo || item.colorNo}}</view>
           <view class="lib-pigment-trans">{{item._metaSub}}</view>
         </view>
         <view wx:if="{{!libCompareMode}}" class="lib-swatch-wrap">
@@ -231,7 +235,9 @@
 
   <!-- ============ 模式 3：今日签 ============ -->
   <block wx:if="{{activeTab === 'lottery'}}">
-    <scroll-view scroll-y class="lottery-scroll" enhanced show-scrollbar="{{false}}">
+    <scroll-view scroll-y class="lottery-scroll" enhanced show-scrollbar="{{false}}"
+      refresher-enabled refresher-default-style="black" refresher-background="#F5F5F5"
+      refresher-triggered="{{refresherTriggered}}" bindrefresherrefresh="onPagePullRefresh">
       <view class="lottery-page">
 
         <!-- 紧凑条件条（默认显示，含「⚙ 调整」入口） -->
@@ -437,7 +443,9 @@
         </view>
 
         <!-- 颜料网格 -->
-        <scroll-view scroll-y class="scheme-grid-section" wx:if="{{activeScheme}}">
+        <scroll-view scroll-y class="scheme-grid-section" wx:if="{{activeScheme}}"
+          refresher-enabled refresher-default-style="black" refresher-background="#F5F5F5"
+          refresher-triggered="{{refresherTriggered}}" bindrefresherrefresh="onPagePullRefresh">
           <view class="scheme-grid">
             <view
               class="scheme-card {{!item.owned ? 'unowned' : ''}}"
@@ -457,7 +465,7 @@
                 <text class="scheme-brand-badge">{{item._brandAbbr}}</text>
               </view>
               <view class="scheme-name">{{item.nameCn}}</view>
-              <view class="scheme-color-no">{{item.colorNo}}</view>
+              <view class="scheme-color-no">{{item.displayColorNo || item.colorNo}}</view>
             </view>
             <!-- 添加占位卡（仅编辑态 + 未达上限时显示） -->
             <view
@@ -571,7 +579,7 @@
           <view class="scheme-color-swatch" style="background: {{item.swatch || '#FAFAFA'}};"></view>
           <view class="scheme-color-info">
             <view class="scheme-color-meta">
-              <text class="scheme-color-no-tag">{{item.colorNo}}</text>
+              <text class="scheme-color-no-tag">{{item.displayColorNo || item.colorNo}}</text>
             </view>
             <view class="scheme-color-name">{{item.nameCn}}</view>
             <view class="scheme-color-en">{{item.nameEn}}</view>
@@ -873,7 +881,7 @@
           </view>
           <view class="drawer-en">{{drawerPigment.nameEn}}</view>
           <view class="drawer-chip-wrap">
-            <text class="drawer-chip">{{drawerPigment.colorNo}}</text>
+            <text class="drawer-chip">{{drawerPigment.displayColorNo || drawerPigment.colorNo}}</text>
           </view>
         </view>
       </view>
@@ -977,7 +985,7 @@
         >
           <view class="compare-cart-brand">{{item._brandAbbr || '?'}}</view>
           <view class="compare-cart-mid">
-            <view class="compare-cart-no">{{item.colorNo}}</view>
+            <view class="compare-cart-no">{{item.displayColorNo || item.colorNo}}</view>
             <view class="compare-cart-cn">{{item.nameCn}}</view>
           </view>
           <image wx:if="{{item.swatchImage}}" class="compare-cart-swatch compare-cart-swatch-img" src="{{item.swatchImage}}" mode="aspectFill"></image>
