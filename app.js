@@ -69,6 +69,21 @@ App({
   },
   onShow() {
     console.log('[app] onShow', _now());
+    // 每次回到前台都强制拉取云端最新状态（force=true 跳过节流）
+    if (this.globalData.cloudInited) {
+      try {
+        const pigmentStore = require('./utils/pigment-store.js');
+        pigmentStore.pullFromCloud(true).then(res => {
+          if (res && res.success && !res.skipped) {
+            console.log('[app] onShow 云端用户状态拉取成功');
+          }
+        }).catch(err => {
+          console.warn('[app] onShow 云端拉取失败', err);
+        });
+      } catch (err) {
+        console.warn('[app] onShow 云端拉取调用异常', err);
+      }
+    }
   },
   onError(err) {
     console.error('[app] onError', _now(), err);

@@ -14,6 +14,7 @@ const cloud = require('wx-server-sdk');
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
 const db = cloud.database();
+const _ = db.command;  // 数据库操作符（_.set 用于强制替换嵌套字段，不深度合并）
 const COLL = 'user_states';
 
 // 工具：浅合并两份 states，按 markedAt 取较新
@@ -99,8 +100,13 @@ exports.main = async (event = {}) => {
       const now = Date.now();
       const res = await safeGet(OPENID);
       if (res.data && res.data.length > 0) {
+        // 关键：用 _.set() 强制替换整个 states 字段
+        // 否则云数据库 update 会对嵌套对象做深度合并，导致被取消（删除）的颜料 key 仍保留在云端
         await db.collection(COLL).doc(res.data[0]._id).update({
-          data: { states: incoming, updatedAt: now },
+          data: {
+            states: _.set(incoming),
+            updatedAt: now,
+          },
         });
       } else {
         // 关键：云函数中 add 必须手动写入 _openid，否则查询不到
@@ -119,7 +125,10 @@ exports.main = async (event = {}) => {
       const merged = mergeStates(oldStates, incoming);
       if (doc) {
         await db.collection(COLL).doc(doc._id).update({
-          data: { states: merged, updatedAt: now },
+          data: {
+            states: _.set(merged),  // 同样用 _.set 强制替换
+            updatedAt: now,
+          },
         });
       } else {
         await db.collection(COLL).add({

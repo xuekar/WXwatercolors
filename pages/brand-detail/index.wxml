@@ -105,6 +105,8 @@
     bindscrolltolower="onListScrollToLower"
     lower-threshold="200"
     style="padding-bottom: {{markMode ? '180rpx' : (compareMode ? '180rpx' : '0')}};"
+    refresher-enabled refresher-default-style="black" refresher-background="#F5F5F5"
+    refresher-triggered="{{refresherTriggered}}" bindrefresherrefresh="onPagePullRefresh"
   >
     <view
       class="pigment-row {{compareMode && item._compareSelected ? 'compare-selected' : ''}}"
@@ -116,7 +118,7 @@
       hover-stay-time="80"
     >
       <view class="col-no">
-        <view class="col-no-text">{{item.colorNo}}</view>
+        <view class="col-no-text">{{item.displayColorNo || item.colorNo}}</view>
       </view>
       <view class="col-name">
         <view class="col-name-cn">{{item.nameCn}}</view>
@@ -227,7 +229,7 @@
           </view>
           <view class="drawer-en">{{drawerPigment.nameEn}}</view>
           <view class="drawer-chip-wrap">
-            <text class="drawer-chip">{{drawerPigment.colorNo}}</text>
+            <text class="drawer-chip">{{drawerPigment.displayColorNo || drawerPigment.colorNo}}</text>
           </view>
         </view>
       </view>
@@ -457,7 +459,7 @@
         >
           <view class="compare-cart-brand">{{item._brandAbbr || 'DS'}}</view>
           <view class="compare-cart-mid">
-            <view class="compare-cart-no">{{item.colorNo}}</view>
+            <view class="compare-cart-no">{{item.displayColorNo || item.colorNo}}</view>
             <view class="compare-cart-cn">{{item.nameCn}}</view>
           </view>
           <image wx:if="{{item.swatchImage}}" class="compare-cart-swatch compare-cart-swatch-img" src="{{item.swatchImage}}" mode="aspectFill"></image>

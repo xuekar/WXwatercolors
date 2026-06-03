@@ -43,6 +43,33 @@ Page({
     this.setData({ swatchDrawerVisible: false });
   },
 
+  // 下拉刷新：5 秒内只能拉取一次，强制刷新云端数据
+  onPullDownRefresh() {
+    const now = Date.now();
+    if (this._lastPullDownAt && now - this._lastPullDownAt < 5000) {
+      const wait = Math.ceil((5000 - (now - this._lastPullDownAt)) / 1000);
+      wx.stopPullDownRefresh();
+      wx.showToast({ title: `请 ${wait}s 后再试`, icon: 'none', duration: 1500 });
+      return;
+    }
+    this._lastPullDownAt = now;
+    const app = getApp();
+    if (!app || !app.globalData || !app.globalData.cloudInited) {
+      wx.stopPullDownRefresh();
+      wx.showToast({ title: '云端未就绪', icon: 'none', duration: 1500 });
+      return;
+    }
+    const pigmentStore = require('../../utils/pigment-store.js');
+    pigmentStore.pullFromCloud(true).then(res => {
+      wx.stopPullDownRefresh();
+      const ok = res && res.success && !res.skipped;
+      wx.showToast({ title: ok ? '已同步最新' : '已是最新', icon: 'none', duration: 1500 });
+    }).catch(() => {
+      wx.stopPullDownRefresh();
+      wx.showToast({ title: '刷新失败', icon: 'none', duration: 1500 });
+    });
+  },
+
   onShareAppMessage() {
     return {
       title: '锻造你的色彩世界',

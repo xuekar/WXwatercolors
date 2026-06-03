@@ -15,8 +15,15 @@
     >
       <!-- 色卡 -->
       <view class="compare-card-swatch-wrap">
+        <image
+          wx:if="{{item.swatchImage}}"
+          class="compare-card-swatch"
+          src="{{item.swatchImage}}"
+          mode="aspectFill"
+          lazy-load
+        ></image>
         <view
-          wx:if="{{item.swatch}}"
+          wx:elif="{{item.swatch}}"
           class="compare-card-swatch"
           style="background: {{item.swatch}}"
         ></view>
@@ -25,7 +32,7 @@
       <!-- 品牌缩写 + 色号 -->
       <view class="compare-card-no-row">
         <text wx:if="{{item._brandAbbr}}" class="compare-card-brand-badge">{{item._brandAbbr}}</text>
-        <text class="compare-card-no">{{item.colorNo}}</text>
+        <text class="compare-card-no">{{item.displayColorNo || item.colorNo}}</text>
       </view>
       <!-- 中文名（主信息） -->
       <view class="compare-card-cn">{{item.nameCn}}</view>
@@ -45,6 +52,7 @@
 <view class="swatch-drawer-mask {{swatchDrawerVisible ? 'show' : ''}}" bindtap="onSwatchDrawerClose">
   <view class="swatch-drawer-panel {{swatchDrawerVisible ? 'show' : ''}}" catchtap="">
     <view class="swatch-drawer-handle"></view>
-    <view class="swatch-drawer-color" style="background: {{swatchDrawerColor}}"></view>
+    <image wx:if="{{swatchDrawerImage}}" class="swatch-drawer-color" src="{{swatchDrawerImage}}" mode="aspectFill"></image>
+    <view wx:else class="swatch-drawer-color" style="background: {{swatchDrawerColor}}"></view>
   </view>
 </view>
