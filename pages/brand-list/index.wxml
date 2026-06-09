@@ -24,7 +24,7 @@
       data-tab="lottery"
       bindtap="onTabChange"
     >
-      <view class="tab-label">今日签</view>
+      <view class="tab-label">幸运绘</view>
       <view class="tab-bar"></view>
     </view>
     <view
@@ -296,7 +296,7 @@
         <view wx:if="{{lotteryHasResult}}" class="lottery-result">
           <view class="lottery-result-header">
             <view class="lottery-result-title">
-              <text class="lottery-result-mark">签</text>今日抽中
+              <text class="lottery-result-mark">签</text>今天就用它们来张好画吧
             </view>
             <view class="lottery-result-meta">共 {{lotteryDrawn.length}} 个</view>
           </view>
