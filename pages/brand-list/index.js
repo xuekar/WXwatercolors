@@ -1921,6 +1921,7 @@ Page({
     return {
       title: cfg.title,
       path: cfg.path,
+      imageUrl: '/images/share-thumb.png',
     };
   },
 
