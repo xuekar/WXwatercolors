@@ -719,10 +719,11 @@ Page({
 
   // ============ 分享 ============
   onShareAppMessage() {
+    const app = getApp();
     return {
       title: '锻造你的色彩世界',
       path: `/pages/brand-detail/index?id=${this.data.brandId}`,
-      imageUrl: '/images/share-thumb.jpg',
+      imageUrl: (app.globalData && app.globalData.shareImageUrl) || '/images/share-thumb.jpg',
     };
   },
 
