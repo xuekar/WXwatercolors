@@ -55,4 +55,6 @@
     <image wx:if="{{swatchDrawerImage}}" class="swatch-drawer-color" src="{{swatchDrawerImage}}" mode="aspectFill"></image>
     <view wx:else class="swatch-drawer-color" style="background: {{swatchDrawerColor}}"></view>
   </view>
+  <!-- 分享缩略图预加载 -->
+  <image src="/images/share-thumb.jpg" style="position:fixed;left:-9999px;width:1px;height:1px" />
 </view>

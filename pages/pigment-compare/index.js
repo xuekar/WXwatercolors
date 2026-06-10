@@ -74,7 +74,7 @@ Page({
     return {
       title: '锻造你的色彩世界',
       path: '/pages/brand-list/index',
-      imageUrl: '/images/share-thumb.png',
+      imageUrl: '/images/share-thumb.jpg',
     };
   },
 
