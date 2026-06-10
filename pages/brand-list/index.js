@@ -1918,10 +1918,11 @@ Page({
 
   onShareAppMessage() {
     const cfg = this._buildShareConfig();
+    const app = getApp();
     return {
       title: cfg.title,
       path: cfg.path,
-      imageUrl: '/images/share-thumb.jpg',
+      imageUrl: (app.globalData && app.globalData.shareImageUrl) || '/images/share-thumb.jpg',
     };
   },
 
