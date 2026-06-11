@@ -1,7 +1,12 @@
 {
   "description": "水彩品牌色卡管理小程序",
   "packOptions": {
-    "ignore": [],
+    "ignore": [
+      { "type": "folder", "value": "images/hbn-swatches" },
+      { "type": "folder", "value": "images/ds-swatches" },
+      { "type": "folder", "value": "tools" },
+      { "type": "file", "value": "images/share-thumb.png" }
+    ],
     "include": []
   },
   "setting": {

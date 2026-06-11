@@ -24,8 +24,7 @@ App({
       this.globalData.cloudInited = false;
     }
 
-    // 分享缩略图：尝试上传到云存储获取 cloud file ID（正式版更可靠）
-    // 体验版/开发版接收方不显示缩略图是微信平台限制，非代码问题
+    // 分享缩略图：上传到云存储并获取 HTTPS 公网链接（分享卡片需要公网可访问的 URL）
     this._ensureShareImage();
 
     // 启动时预热：从本地存储读取用户标记状态，按品牌算出 owned/wishlist 计数
@@ -93,29 +92,33 @@ App({
     console.error('[app] onError', _now(), err);
   },
   /**
-   * 确保分享缩略图已上传到云存储
-   * 返回 cloud file ID 或降级到本地路径
-   * 体验版/开发版接收方不显示缩略图是微信平台限制，正式版上线后正常
+   * 确保分享缩略图已上传到云存储，并获取 HTTPS 公网链接
+   * 微信分享卡片的 imageUrl 必须是公网可访问的 HTTPS 链接
+   * cloud:// fileID 和本地路径在接收方不可见
    */
   _ensureShareImage() {
     const CLOUD_PATH = 'share-thumb.jpg';
     const LOCAL_PATH = '/images/share-thumb.jpg';
-    const CACHE_KEY = 'wc_share_image_id';
+    const CACHE_KEY = 'wc_share_image_https';
+    const CACHE_TTL = 12 * 60 * 60 * 1000; // 12 小时后重新获取（私有读链接有效期 24h）
 
-    // 优先使用缓存的 cloud file ID
+    // 优先使用缓存的 HTTPS 链接（未过期）
     try {
-      const cached = wx.getStorageSync(CACHE_KEY);
-      if (cached) {
-        this.globalData.shareImageUrl = cached;
-        console.log('[app] 分享缩略图 cloud ID 已缓存');
-        return;
+      const cacheStr = wx.getStorageSync(CACHE_KEY);
+      if (cacheStr) {
+        const cache = JSON.parse(cacheStr);
+        if (cache.url && cache.url.startsWith('https://') && (Date.now() - cache.ts < CACHE_TTL)) {
+          this.globalData.shareImageUrl = cache.url;
+          console.log('[app] 分享缩略图 HTTPS 链接已缓存');
+          return;
+        }
       }
     } catch (e) { /* ignore */ }
 
-    // 默认降级到本地路径
+    // 默认降级到本地路径（发送者本人可见）
     this.globalData.shareImageUrl = LOCAL_PATH;
 
-    // 异步上传到云存储
+    // 异步上传到云存储并获取 HTTPS 链接
     if (!this.globalData.cloudInited) return;
 
     const fs = wx.getFileSystemManager();
@@ -132,11 +135,26 @@ App({
       cloudPath: CLOUD_PATH,
       filePath: tempPath,
       success: (res) => {
-        this.globalData.shareImageUrl = res.fileID;
-        try { wx.setStorageSync(CACHE_KEY, res.fileID); } catch (e) {}
         console.log('[app] 分享缩略图已上传云存储', res.fileID);
         // 清理临时文件
         try { fs.unlinkSync(tempPath); } catch (e) {}
+        // 通过 getTempFileURL 获取 HTTPS 公网链接
+        wx.cloud.getTempFileURL({
+          fileList: [res.fileID],
+          success: (urlRes) => {
+            if (urlRes.fileList && urlRes.fileList[0] && urlRes.fileList[0].tempFileURL) {
+              const httpsUrl = urlRes.fileList[0].tempFileURL;
+              this.globalData.shareImageUrl = httpsUrl;
+              try {
+                wx.setStorageSync(CACHE_KEY, JSON.stringify({ url: httpsUrl, ts: Date.now() }));
+              } catch (e) {}
+              console.log('[app] 分享缩略图 HTTPS 链接', httpsUrl);
+            }
+          },
+          fail: (err) => {
+            console.warn('[app] getTempFileURL 失败', err);
+          }
+        });
       },
       fail: (err) => {
         console.warn('[app] 分享缩略图上传云存储失败，使用本地路径', err);
@@ -152,6 +170,6 @@ App({
     ownedCounts: {},
     wishlistCounts: {},
     cloudInited: false,
-    shareImageUrl: '/images/share-thumb.jpg',  // 分享缩略图（云存储 fileID 或降级本地路径）
+    shareImageUrl: '/images/share-thumb.jpg',  // 分享缩略图（云存储 HTTPS 公网链接 或降级本地路径）
   }
 });
