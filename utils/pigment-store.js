@@ -271,6 +271,143 @@ function _mergeUserStates(brandId, list) {
   });
 }
 
+// ============ 色系计算 ============
+// 色系分类定义（与 UI 筛选、抽屉 tag 共用）
+// cn 名称以 Excel 数据源为准
+const COLOR_FAMILIES = {
+  red:            { cn: '红色系',   color: '#E74C3C' },
+  yellowOrange:   { cn: '黄橙色系', color: '#F39C12' },
+  bluePurple:     { cn: '蓝紫系',   color: '#5B6ABF' },
+  green:          { cn: '绿色系',   color: '#27AE60' },
+  earth:          { cn: '土色系',   color: '#A0845C' },
+  granulating:    { cn: '沉淀系',   color: '#88929E' },
+  pearlescent:    { cn: '珠光系',   color: '#DAC06E' },
+  neutral:        { cn: '黑白色系', color: '#5D6D7E' },
+};
+
+// Excel 中文名 → 内部 key 映射
+const EXCEL_NAME_TO_KEY = {
+  '红色系': 'red',
+  '黄橙色系': 'yellowOrange',
+  '蓝紫系': 'bluePurple',
+  '绿色系': 'green',
+  '土色系': 'earth',
+  '沉淀系': 'granulating',
+  '珠光系': 'pearlescent',
+  '黑白色系': 'neutral',
+};
+
+// 色系权重优先级的顺序（沉淀/珠光在颜色计算之前判断）
+const FAMILY_ORDER = ['granulating', 'pearlescent', 'earth', 'red', 'yellowOrange', 'bluePurple', 'green', 'neutral'];
+
+// Excel 色系映射（外部数据源，按 brandId → colorNo → colorFamily 索引）
+// 在 _loadAsync 惰性加载
+let _excelColorFamilyMap = null;
+function _loadExcelColorFamilyMap() {
+  if (_excelColorFamilyMap) return _excelColorFamilyMap;
+  try {
+    _excelColorFamilyMap = require('./data/color-family-mapping.js');
+  } catch (e) {
+    console.warn('[pigment-store] 无法加载 Excel 色系映射文件', e);
+    _excelColorFamilyMap = {};
+  }
+  return _excelColorFamilyMap;
+}
+
+// 已知沉淀类色料代码（天然矿物 / 沉淀效果）
+const GRANULATING_PIGMENTS = new Set([
+  'PB29', 'PB28', 'PB36', 'PBk11', 'PBk6', 'PR101', 'PR102',
+  'PR233', 'PG18', 'PG23', 'PY43', 'PBr7', 'PBr33',
+]);
+
+// 已知珠光类关键词
+const PEARL_KEYWORDS = ['pearl', 'mica', 'iridescent', 'interference', 'duochrome', 'shimmer', 'pearlescent', '珠光', '珍珠', '云母', '闪光', '幻彩'];
+
+function _colorFamilyFor(pigment, brandId) {
+  const { nameEn, nameCn, pigment: pigCode, swatch, series, colorNo } = pigment || {};
+
+  // === 0. 优先使用 Excel 色系数据（权威来源）===
+  if (brandId && colorNo) {
+    const map = _loadExcelColorFamilyMap();
+    const brandMap = map[String(brandId)];
+    if (brandMap) {
+      const excelFamily = brandMap[String(colorNo)];
+      if (excelFamily && EXCEL_NAME_TO_KEY[excelFamily]) {
+        return EXCEL_NAME_TO_KEY[excelFamily];
+      }
+    }
+  }
+
+  const nameLower = ((nameEn || '') + ' ' + (nameCn || '')).toLowerCase();
+
+  // 1. 品牌标注的特殊系列
+  if (series === 'Primatek') return 'granulating';
+
+  // 2. 名称含珠光关键词 → 珠光系
+  for (const kw of PEARL_KEYWORDS) {
+    if (nameLower.includes(kw)) return 'pearlescent';
+  }
+
+  // 3. 色料代码匹配沉淀系
+  if (pigCode) {
+    const codes = String(pigCode).split(/[,，\s]+/).map(s => s.trim().toUpperCase());
+    for (const c of codes) {
+      if (GRANULATING_PIGMENTS.has(c)) return 'granulating';
+    }
+  }
+
+  // 4. 色料代码匹配土色系（PBr 系列 + 部分天然土色）
+  if (pigCode) {
+    const codes = String(pigCode).split(/[,，\s]+/).map(s => s.trim().toUpperCase());
+    for (const c of codes) {
+      if (/^PBr/i.test(c) || c === 'PY43' || c === 'PR102' || c === 'PBk11') return 'earth';
+    }
+  }
+
+  // 5. 根据色卡 hex 计算 hue
+  if (swatch && typeof swatch === 'string' && swatch.startsWith('#')) {
+    const hex = swatch.replace('#', '');
+    if (hex.length === 6) {
+      const r = parseInt(hex.slice(0, 2), 16) / 255;
+      const g = parseInt(hex.slice(2, 4), 16) / 255;
+      const b = parseInt(hex.slice(4, 6), 16) / 255;
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const l = (max + min) / 2;
+      const d = max - min;
+      const s = l > 0.5 ? (d / (2 - max - min)) : (d / (max + min));
+
+      // 黑白系：低饱和度或极端明度
+      if (s < 0.12 || l < 0.05 || l > 0.95) return 'neutral';
+
+      // 计算 hue (0-360)
+      let hue = 0;
+      if (d > 0) {
+        if (max === r) hue = ((g - b) / d + (g < b ? 6 : 0)) * 60;
+        else if (max === g) hue = ((b - r) / d + 2) * 60;
+        else hue = ((r - g) / d + 4) * 60;
+      }
+
+      if (hue >= 0 && hue < 20 || hue >= 340) return 'red';
+      if (hue >= 20 && hue < 55) return 'yellowOrange';
+      if (hue >= 55 && hue < 190) return 'green';
+      if (hue >= 190 && hue < 290) return 'bluePurple';
+      // fallback
+      if (hue >= 290 && hue < 340) return 'red';
+    }
+  }
+
+  // 6. 中英文名称关键字兜底
+  if (/红|洋红|茜|朱|猩红|深红|crimson|magenta|red|scarlet|rose|pink/i.test(nameLower)) return 'red';
+  if (/黄|橙|金| lemon|yellow|orange|gold|cadmium\s*yellow/i.test(nameLower)) return 'yellowOrange';
+  if (/蓝|青|紫|群青|靛|blue|cyan|purple|violet|ultramarine|indigo|cerulean/i.test(nameLower)) return 'bluePurple';
+  if (/绿|green|viridian|sap|emerald|olive|hooker/i.test(nameLower)) return 'green';
+  if (/棕|褐|赭|土|umber|sienna|ochre|earth|brown|sepia|burnt|raw/i.test(nameLower)) return 'earth';
+  if (/黑|灰|白|black|white|grey|gray|ivory|titanium|zinc/i.test(nameLower)) return 'neutral';
+
+  return 'neutral';
+}
+
 // ============ 内存缓存 ============
 const _pigmentsCache = {};
 
@@ -324,8 +461,10 @@ function _loadAsync(brandId) {
                 : p.colorNo,
             }));
           } else {
-            src = src.map(p => ({ ...p, displayColorNo: p.colorNo }));
+            src = src.map(p => ({ ...p, displayColorNo: p.displayColorNo || p.colorNo }));
           }
+          // 计算色系（动态，不修改原始 data 文件—优先 Excel 数据源）
+          src = src.map(p => ({ ...p, colorFamily: _colorFamilyFor(p, brandId) }));
           // 关键：从原始数据出发，合并 storage 中的用户标记
           _pigmentsCache[brandId] = _mergeUserStates(brandId, src);
           // 同步一次统计数到 globalData（页面初次进来时品牌列表能立即拿到正确数字）
@@ -417,5 +556,9 @@ module.exports = {
 
   // 启动时由 app.onLaunch 调用，触发云端拉取与合并
   pullFromCloud,
+
+  // 色系配置（供页面引用）
+  COLOR_FAMILIES,
+  FAMILY_ORDER,
 };
 

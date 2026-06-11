@@ -172,6 +172,8 @@ Page({
         this.refresh();
         if (this.data.activeTab === 'library') {
           this._reloadLibraryDataIfNeeded();
+        } else if (this.data.activeTab === 'lottery') {
+          this._enterLottery();
         } else if (this.data.activeTab === 'scheme') {
           this._enterScheme();
         }
@@ -212,6 +214,7 @@ Page({
       this.refresh();
       this._allPigments = null;
       if (this.data.activeTab === 'library') this._reloadLibraryDataIfNeeded();
+      else if (this.data.activeTab === 'lottery') this._enterLottery();
     }
 
     // 主动触发云端拉取并等待结果（重要：仅靠 app.onShow 触发会因为时序问题无法刷新页面）
@@ -228,6 +231,7 @@ Page({
               this._allPigments = null;
               this.refresh();
               if (this.data.activeTab === 'library') this._reloadLibraryDataIfNeeded();
+              else if (this.data.activeTab === 'lottery') this._enterLottery();
               else if (this.data.activeTab === 'scheme') this._enterScheme();
             }
           }
@@ -262,6 +266,7 @@ Page({
         this._allPigments = null;
         this.refresh();
         if (this.data.activeTab === 'library') this._reloadLibraryDataIfNeeded();
+        else if (this.data.activeTab === 'lottery') this._enterLottery();
         else if (this.data.activeTab === 'scheme') this._enterScheme();
         this.showToast('已同步最新');
       } else {
@@ -1059,6 +1064,12 @@ Page({
   // 抽签！
   onLotteryDraw() {
     if (this.data.lotteryAnimating) return;
+    // 防御性检查：如果 _allPigments 被云同步清空，先重新加载再抽签
+    if (!this._allPigments) {
+      this._enterLottery();
+      this.showToast('正在刷新数据，请稍后再试');
+      return;
+    }
     const all = this._allPigments || [];
     const owned = all.filter(p => p.owned);
     const Y = this.data.lotteryConfig.count || 3;
